@@ -1,0 +1,57 @@
+name: Smoke Check
+
+on:
+  push:
+    branches: [main]
+  pull_request:
+    branches: [main]
+
+jobs:
+  smoke:
+    runs-on: ubuntu-latest
+    timeout-minutes: 10
+
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v4
+
+      - name: Setup Node
+        uses: actions/setup-node@v4
+        with:
+          node-version: "25"
+          cache: "npm"
+
+      - name: Install dependencies
+        run: npm ci
+
+      - name: Start server
+        env:
+          ADMIN_KEY: ci-admin-key
+        run: |
+          npm start > server.log 2>&1 &
+          echo $! > server.pid
+
+      - name: Wait for server
+        run: |
+          for i in {1..30}; do
+            if curl -fsS http://127.0.0.1:3000/admin >/dev/null; then
+              echo "Server up"
+              exit 0
+            fi
+            sleep 1
+          done
+          echo "Server did not start"
+          cat server.log || true
+          exit 1
+
+      - name: Smoke endpoints
+        run: |
+          node -e "const base='http://127.0.0.1:3000';(async()=>{const admin=await fetch(base+'/api/admin/session',{headers:{'x-admin-key':'ci-admin-key'}});if(admin.status!==200){throw new Error('admin session failed: '+admin.status);}for(const p of ['/css/styles.css','/js/admin.js','/sw.js']){const r=await fetch(base+p);if(r.status!==200){throw new Error(p+' failed: '+r.status);}}console.log('smoke ok');})();"
+
+      - name: Stop server
+        if: always()
+        run: |
+          if [ -f server.pid ]; then
+            kill $(cat server.pid) || true
+          fi
+          cat server.log || true
