@@ -1,0 +1,118 @@
+<!doctype html>
+<html lang="es">
+  <head>
+    <meta charset="UTF-8" />
+    <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+    <title>PRODE Mundial 2026 - Admin</title>
+    <link rel="icon" type="image/png" href="/assets/logo.png" />
+    <link rel="stylesheet" href="/css/styles.css" />
+    <link rel="preconnect" href="https://fonts.googleapis.com" />
+    <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin />
+    <link href="https://fonts.googleapis.com/css2?family=Roboto:wght@400;500;700&display=swap" rel="stylesheet" />
+  </head>
+  <body>
+    <main class="container stack">
+      <section class="card hero">
+        <h1 class="brand-title"><img src="/assets/logo.png" alt="Logo PRODE Mundial 2026" /> <span>PRODE Mundial 2026</span></h1>
+        <p>Creá torneos privados, generá links únicos para tus amigos y cargá resultados reales para ver el ranking en vivo.</p>
+      </section>
+
+      <section class="card stack">
+        <h2>Acceso admin</h2>
+        <div class="row">
+          <input id="adminKey" type="password" placeholder="Clave admin" />
+          <button id="saveAdminKey">Guardar clave</button>
+          <button id="clearAdminKey" class="secondary">Limpiar</button>
+        </div>
+        <p id="adminAuthMsg" class="muted"></p>
+      </section>
+
+      <section class="card stack">
+        <div class="tabs" id="mainTabs">
+          <button class="tab active" data-tab="admin">Admin</button>
+          <button class="tab" data-tab="groups">Fase de Grupos</button>
+          <button class="tab" data-tab="final">Fase Final</button>
+          <button class="tab" data-tab="r16">Definición 16vos de final</button>
+        </div>
+
+        <div class="tab-panel" data-panel="admin">
+          <div class="row" style="align-items:center; justify-content:space-between;">
+            <h2 style="margin:0">Torneos</h2>
+            <button id="openCreateBtn">+ Nuevo torneo</button>
+          </div>
+          <p id="createMsg" class="notice"></p>
+        </div>
+
+        <div class="tab-panel hidden" data-panel="groups">
+          <h2>Fase de grupos global</h2>
+          <p class="muted">Desde acá cargás horarios y resultados reales para todos los torneos.</p>
+          <div id="globalSchedule" class="stack muted">Cargando...</div>
+          <p id="globalScheduleMsg" class="notice"></p>
+        </div>
+
+        <div class="tab-panel hidden" data-panel="final">
+          <h2>Fase final global</h2>
+          <p class="muted">Cargá resultados reales y horarios de los partidos de eliminación directa.</p>
+          <div id="globalKnockoutEditor" class="stack muted">Cargando...</div>
+          <p class="muted" id="globalBonusView"></p>
+          <p id="globalKnockoutMsg" class="notice"></p>
+        </div>
+
+        <div class="tab-panel hidden" data-panel="r16">
+          <h2>Definición de 16vos de final</h2>
+          <p class="muted">Elegí los equipos con dropdown y horario del partido.</p>
+          <div id="globalR16Editor" class="stack muted">Cargando...</div>
+          <button id="saveGlobalR16">Guardar 16vos globales</button>
+        </div>
+      </section>
+
+      <section class="card stack">
+        <h2>Torneos creados</h2>
+        <div id="tournamentList" class="stack muted">Cargando...</div>
+      </section>
+
+      <div id="createModal" class="modal hidden" role="dialog" aria-modal="true" aria-labelledby="createModalTitle">
+        <div class="modal-card stack">
+          <h3 id="createModalTitle">Nuevo torneo</h3>
+          <label>
+            Nombre del torneo
+            <input id="createModalName" placeholder="Ej: Prode Amigos del Barrio" />
+          </label>
+          <label>
+            Participantes (uno por línea)
+            <textarea id="createModalParticipants" rows="6" placeholder="Ana&#10;Juan&#10;Martin"></textarea>
+          </label>
+          <div class="row" style="justify-content:flex-end;">
+            <button id="createModalCancel" class="secondary" type="button">Cancelar</button>
+            <button id="createModalSave" type="button">Crear torneo</button>
+          </div>
+        </div>
+      </div>
+
+      <div id="appModal" class="modal hidden" role="dialog" aria-modal="true" aria-labelledby="modalTitle">
+        <div class="modal-card">
+          <h3 id="modalTitle">Confirmar</h3>
+          <p id="modalText" class="muted"></p>
+          <div class="row" style="justify-content:flex-end;">
+            <button id="modalCancel" class="secondary">Cancelar</button>
+            <button id="modalOk">Aceptar</button>
+          </div>
+        </div>
+      </div>
+
+      <div id="datetimeModal" class="modal hidden" role="dialog" aria-modal="true" aria-labelledby="datetimeModalTitle">
+        <div class="modal-card stack">
+          <h3 id="datetimeModalTitle">Editar fecha y hora</h3>
+          <input id="datetimeModalInput" type="datetime-local" />
+          <div class="row" style="justify-content:flex-end;">
+            <button id="datetimeModalClear" class="secondary" type="button">Limpiar</button>
+            <button id="datetimeModalCancel" class="secondary" type="button">Cancelar</button>
+            <button id="datetimeModalSave" type="button">Guardar</button>
+          </div>
+        </div>
+      </div>
+    </main>
+
+    <script type="module" src="/js/admin.js"></script>
+  </body>
+</html>

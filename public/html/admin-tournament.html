@@ -1,0 +1,83 @@
+<!doctype html>
+<html lang="es">
+  <head>
+    <meta charset="UTF-8" />
+    <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+    <title>PRODE Mundial 2026 - Torneo</title>
+    <link rel="icon" type="image/png" href="/assets/logo.png" />
+    <link rel="stylesheet" href="/css/styles.css" />
+    <link rel="preconnect" href="https://fonts.googleapis.com" />
+    <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin />
+    <link href="https://fonts.googleapis.com/css2?family=Roboto:wght@400;500;700&display=swap" rel="stylesheet" />
+  </head>
+  <body>
+    <main class="container stack">
+      <section class="card hero">
+        <div class="row" style="justify-content: space-between; align-items: center;">
+          <div class="row" style="align-items:center;">
+            <h1 id="title" style="margin:0;">Torneo</h1>
+            <button id="openRenameTournamentIcon" class="icon-btn" type="button" aria-label="Cambiar nombre del torneo">✎</button>
+          </div>
+          <a href="/admin" class="tag">Volver</a>
+        </div>
+        <p>Panel admin del torneo para gestionar participantes y revisar posiciones. Los partidos se editan globalmente en el panel principal.</p>
+      </section>
+
+      <section class="card stack">
+        <h2>Acceso admin</h2>
+        <div class="row">
+          <input id="adminKey" type="password" placeholder="Clave admin" />
+          <button id="saveAdminKey">Guardar clave</button>
+          <button id="clearAdminKey" class="secondary">Limpiar</button>
+        </div>
+        <p id="adminAuthMsg" class="muted"></p>
+      </section>
+
+      <section class="card stack">
+        <h2>Participantes</h2>
+        <div class="row">
+          <input id="newParticipantName" placeholder="Nombre del participante" />
+          <button id="addParticipant">Agregar participante</button>
+        </div>
+        <div id="links" class="stack link-list"></div>
+      </section>
+
+      <section class="card stack">
+        <h2>Posiciones</h2>
+        <div id="leaderboard"></div>
+      </section>
+
+      <section class="card stack">
+        <h2>Zona peligrosa</h2>
+        <p class="muted">Eliminá el torneo completo y todos sus participantes.</p>
+        <div class="row">
+          <button id="deleteTournament" class="danger">Eliminar torneo</button>
+        </div>
+      </section>
+
+      <div id="renameTournamentModal" class="modal hidden" role="dialog" aria-modal="true" aria-labelledby="renameTournamentTitle">
+        <div class="modal-card stack">
+          <h3 id="renameTournamentTitle">Cambiar nombre del torneo</h3>
+          <input id="renameTournamentInput" placeholder="Nombre del torneo" />
+          <div class="row" style="justify-content:flex-end;">
+            <button id="renameTournamentCancel" class="secondary" type="button">Cancelar</button>
+            <button id="renameTournamentSave" type="button">Guardar nombre</button>
+          </div>
+        </div>
+      </div>
+
+      <div id="appModal" class="modal hidden" role="dialog" aria-modal="true" aria-labelledby="modalTitle">
+        <div class="modal-card">
+          <h3 id="modalTitle">Confirmar</h3>
+          <p id="modalText" class="muted"></p>
+          <div class="row" style="justify-content:flex-end;">
+            <button id="modalCancel" class="secondary">Cancelar</button>
+            <button id="modalOk">Aceptar</button>
+          </div>
+        </div>
+      </div>
+    </main>
+
+    <script type="module" src="/js/admin-tournament.js"></script>
+  </body>
+</html>

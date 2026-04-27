@@ -1,0 +1,82 @@
+<!doctype html>
+<html lang="es">
+  <head>
+    <meta charset="UTF-8" />
+    <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+    <title>PRODE Mundial 2026 - Jugador</title>
+    <link rel="icon" type="image/png" href="/assets/logo.png" />
+    <link rel="stylesheet" href="/css/styles.css" />
+    <link rel="preconnect" href="https://fonts.googleapis.com" />
+    <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin />
+    <link href="https://fonts.googleapis.com/css2?family=Roboto:wght@400;500;700&display=swap" rel="stylesheet" />
+  </head>
+  <body>
+    <main class="container stack">
+      <section class="card hero">
+        <h1 id="title" class="brand-title"><img src="/assets/logo.png" alt="Logo PRODE Mundial 2026" /> <span>PRODE Mundial 2026</span></h1>
+        <p id="subtitle">Cargando...</p>
+        <p id="heroHint" class="muted">Esta carga se bloquea al enviar y no se puede modificar.</p>
+      </section>
+
+      <section class="card stack" id="leaderboardSection" style="display:none">
+        <h2>Tabla de posiciones</h2>
+        <div id="leaderboard"></div>
+      </section>
+
+      <section class="card stack" id="lockNotice" style="display:none">
+        <h2>Pronóstico enviado</h2>
+        <p class="notice" id="lockedAt"></p>
+      </section>
+
+      <section class="card stack" id="bonusSection">
+        <h2>Bonus</h2>
+        <div class="grid-2">
+          <label>Campeón<select id="bonusChampion"></select></label>
+          <label>Subcampeón<select id="bonusRunnerUp"></select></label>
+          <label>Tercero<select id="bonusThird"></select></label>
+          <label>Cuarto<select id="bonusFourth"></select></label>
+        </div>
+      </section>
+
+      <section class="card stack" id="groupsSection">
+        <h2>Fase de grupos</h2>
+        <div id="groups" class="stack"></div>
+        <div id="groupSubmitSlot"></div>
+      </section>
+
+      <section class="card stack" id="knockoutSection">
+        <h2>Fase final</h2>
+        <div id="knockout"></div>
+        <div id="finalSubmitSlot"></div>
+      </section>
+
+      <div class="stack submit-inline" id="submitSection">
+        <button id="submitBtn">Enviar</button>
+        <p id="submitMsg" class="notice"></p>
+      </div>
+
+      <section class="card stack">
+        <h2>Notificaciones</h2>
+        <p class="muted">Activá alertas para recibir un aviso 5 minutos antes de cada partido de fase de grupos.</p>
+        <div class="row">
+          <button id="enableKickoffNotif">Activar notificaciones</button>
+          <button id="disableKickoffNotif" class="secondary">Desactivar</button>
+        </div>
+        <p id="notifStatus" class="muted"></p>
+      </section>
+
+      <div id="appModal" class="modal hidden" role="dialog" aria-modal="true" aria-labelledby="modalTitle">
+        <div class="modal-card">
+          <h3 id="modalTitle">Confirmar</h3>
+          <p id="modalText" class="muted"></p>
+          <div class="row" style="justify-content:flex-end;">
+            <button id="modalCancel" class="secondary">Cancelar</button>
+            <button id="modalOk">Aceptar</button>
+          </div>
+        </div>
+      </div>
+    </main>
+
+    <script type="module" src="/js/player.js"></script>
+  </body>
+</html>

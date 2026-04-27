@@ -1,0 +1,22 @@
+{
+  "name": "prode-mundial-2026",
+  "version": "1.0.0",
+  "private": true,
+  "type": "module",
+  "scripts": {
+    "dev": "node --watch --experimental-strip-types src/server.ts",
+    "build": "node -e \"console.log('No build step required')\"",
+    "start": "node --experimental-strip-types src/server.ts"
+  },
+  "dependencies": {
+    "express": "^4.21.2",
+    "nanoid": "^5.1.5",
+    "web-push": "^3.6.7"
+  },
+  "devDependencies": {
+    "@types/express": "^4.17.21",
+    "@types/node": "^22.10.2",
+    "@types/web-push": "^3.6.4",
+    "typescript": "^5.7.2"
+  }
+}
