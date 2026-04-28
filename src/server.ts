@@ -58,6 +58,7 @@ function normalizeParticipantNames(input: unknown): string[] {
 
 function participantLinks(token: string) {
   return {
+    playerUrl: `/p/${token}`,
     groupUrl: `/p/${token}/group`,
     finalUrl: `/p/${token}/final`
   };
@@ -153,6 +154,17 @@ function parseSubscription(input: unknown) {
   };
 }
 
+function isR16Defined(matches: Array<{ home: string; away: string }>) {
+  if (!matches.length) return false;
+  const isPlaceholder = (team: string) => team.toUpperCase().startsWith("POR DEFINIR");
+
+  return matches.every((match) => {
+    const home = (match.home ?? "").trim();
+    const away = (match.away ?? "").trim();
+    return home.length > 0 && away.length > 0 && !isPlaceholder(home) && !isPlaceholder(away);
+  });
+}
+
 app.get("/", (_req, res) => {
   res.sendFile(path.join(process.cwd(), "public", "html", "admin.html"));
 });
@@ -165,8 +177,12 @@ app.get("/admin/:id", (_req, res) => {
   res.sendFile(path.join(process.cwd(), "public", "html", "admin-tournament.html"));
 });
 
+app.get("/t/:id", (_req, res) => {
+  res.sendFile(path.join(process.cwd(), "public", "html", "public-tournament.html"));
+});
+
 app.get("/p/:token/:stage(group|final)", (_req, res) => {
-  res.sendFile(path.join(process.cwd(), "public", "html", "player.html"));
+  res.redirect(302, `/p/${_req.params.token}`);
 });
 
 app.get("/p/:token", (_req, res) => {
@@ -737,6 +753,23 @@ app.get("/api/tournaments/:id/leaderboard", (req, res) => {
   res.json({ leaderboard: buildLeaderboard(tournament) });
 });
 
+app.get("/api/public/tournaments/:id", (req, res) => {
+  const found = getTournamentOr404(res, req.params.id);
+  if (!found) return;
+
+  const store = readStore();
+  const tournament = withGlobalTournamentData(store, found);
+  res.json({
+    tournament: {
+      id: tournament.id,
+      name: tournament.name,
+      createdAt: tournament.createdAt,
+      participantCount: tournament.participants.length
+    },
+    leaderboard: buildLeaderboard(tournament)
+  });
+});
+
 app.get("/api/p/:token", (req, res) => {
   const found = findTournamentByParticipantToken(req.params.token);
   if (!found) {
@@ -881,6 +914,11 @@ app.post("/api/p/:token/submit-final", (req, res) => {
 
   if (!participant.predictions.groupLockedAt) {
     res.status(409).json({ error: "Primero debés completar la fase de grupos" });
+    return;
+  }
+
+  if (!isR16Defined(store.globalKnockoutMatches.R16)) {
+    res.status(409).json({ error: "La fase final todavía no está habilitada: primero el admin debe definir los cruces de 16vos" });
     return;
   }
 

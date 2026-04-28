@@ -1,0 +1,31 @@
+<!doctype html>
+<html lang="es">
+  <head>
+    <meta charset="UTF-8" />
+    <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+    <title>PRODE Mundial 2026 - Tabla Pública</title>
+    <link rel="icon" type="image/png" href="/assets/logo.png" />
+    <link rel="stylesheet" href="/css/styles.css" />
+    <link rel="preconnect" href="https://fonts.googleapis.com" />
+    <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin />
+    <link href="https://fonts.googleapis.com/css2?family=Roboto:wght@400;500;700&display=swap" rel="stylesheet" />
+  </head>
+  <body>
+    <main class="container stack">
+      <section class="card hero">
+        <h1 id="title" class="brand-title"><img src="/assets/logo.png" alt="Logo PRODE Mundial 2026" /> <span>PRODE Mundial 2026</span></h1>
+        <p id="subtitle">Cargando torneo...</p>
+      </section>
+
+      <section class="card stack">
+        <div class="row" style="justify-content:space-between; align-items:center;">
+          <h2 style="margin:0">Tabla de posiciones pública</h2>
+          <button id="refreshBtn" class="secondary" type="button">Actualizar</button>
+        </div>
+        <div id="leaderboard"></div>
+      </section>
+    </main>
+
+    <script type="module" src="/js/public-tournament.js"></script>
+  </body>
+</html>

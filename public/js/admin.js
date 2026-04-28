@@ -42,6 +42,19 @@ const ADMIN_KEY_STORAGE = "prode_admin_key";
 let knockoutState = null;
 const flashTimers = new Map();
 
+const ROUND_LABELS = {
+  R16: "16vos de final",
+  OCT: "8vos de final",
+  QF: "Cuartos de final",
+  SF: "Semifinales",
+  THIRD: "Tercer puesto",
+  FINAL: "Final"
+};
+
+function roundLabel(round) {
+  return ROUND_LABELS[round] ?? round;
+}
+
 function getAdminKey() {
   return localStorage.getItem(ADMIN_KEY_STORAGE) ?? "";
 }
@@ -212,7 +225,7 @@ async function saveKnockoutKickoff(round, matchId, value) {
     flashMessage(globalKnockoutMsg, "Error al guardar horario", true);
     return;
   }
-  flashMessage(globalKnockoutMsg, `Cambios guardados en ${round}.`);
+  flashMessage(globalKnockoutMsg, `Cambios guardados en ${roundLabel(round)}.`);
 }
 
 function byGroup(matches) {
@@ -301,6 +314,7 @@ function renderTournaments(tournaments) {
         </div>
         <div class="row">
           <a href="/admin/${t.id}" class="btn-primary">Abrir panel</a>
+          <a href="/t/${t.id}" class="btn-primary" target="_blank" rel="noreferrer">Ver link público</a>
           <button class="danger" data-action="delete">Eliminar torneo</button>
         </div>
       </div>
@@ -442,10 +456,12 @@ function renderGlobalKnockout(data) {
     });
 
     return `
-      <div class="group-box stack">
-        <h3>${round}</h3>
-        ${lines.join("")}
-      </div>
+      <details class="group-box">
+        <summary><strong>${roundLabel(round)}</strong></summary>
+        <div class="stack" style="margin-top:8px;">
+          ${lines.join("")}
+        </div>
+      </details>
     `;
   }).join("");
 

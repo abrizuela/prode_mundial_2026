@@ -87,11 +87,17 @@ async function validateAdminKey() {
 
 function renderParticipants(tournament) {
   if (!tournament.participants.length) {
-    links.innerHTML = "<p class=\"muted\">No hay participantes en este torneo.</p>";
+    links.innerHTML = `
+      <div class="group-box stack">
+        <strong>Link público del torneo</strong>
+        <a href="/t/${tournament.id}" target="_blank" rel="noreferrer">${window.location.origin}/t/${tournament.id}</a>
+      </div>
+      <p class="muted">No hay participantes en este torneo.</p>
+    `;
     return;
   }
 
-  links.innerHTML = tournament.participants
+  const participantsHtml = tournament.participants
     .map((p) => `
       <div class="group-box stack" data-participant-id="${p.id}">
         <div class="stack">
@@ -100,8 +106,7 @@ function renderParticipants(tournament) {
             ${p.groupLockedAt ? "<span class='tag'>Grupos enviado</span>" : ""}
             ${p.finalLockedAt ? "<span class='tag'>Final enviado</span>" : ""}
           </span>
-          <a href="${p.groupUrl}" target="_blank" rel="noreferrer">Link grupos: ${window.location.origin}${p.groupUrl}</a>
-          <a href="${p.finalUrl}" target="_blank" rel="noreferrer">Link fase final: ${window.location.origin}${p.finalUrl}</a>
+          <a href="${p.playerUrl || p.groupUrl}" target="_blank" rel="noreferrer">Link jugador: ${window.location.origin}${p.playerUrl || p.groupUrl}</a>
         </div>
         <div class="row">
           <input data-participant-name value="${p.name}" />
@@ -113,6 +118,14 @@ function renderParticipants(tournament) {
       </div>
     `)
     .join("");
+
+  links.innerHTML = `
+    <div class="group-box stack">
+      <strong>Link público del torneo</strong>
+      <a href="/t/${tournament.id}" target="_blank" rel="noreferrer">${window.location.origin}/t/${tournament.id}</a>
+    </div>
+    ${participantsHtml}
+  `;
 
   links.querySelectorAll("button[data-action='rename-participant']").forEach((btn) => {
     btn.addEventListener("click", async () => {

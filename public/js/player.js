@@ -13,7 +13,6 @@ function formatDate(isoOrNull) {
 
 const parts = window.location.pathname.split("/").filter(Boolean);
 const token = parts[1] ?? "";
-const stage = (parts[2] === "final" ? "final" : "group");
 
 const title = document.querySelector("#title");
 const titleText = title?.querySelector("span");
@@ -24,8 +23,10 @@ const groupsWrap = document.querySelector("#groups");
 const knockoutWrap = document.querySelector("#knockout");
 const leaderboardEl = document.querySelector("#leaderboard");
 
-const submitBtn = document.querySelector("#submitBtn");
-const submitMsg = document.querySelector("#submitMsg");
+const submitGroupBtn = document.querySelector("#submitGroupBtn");
+const submitGroupMsg = document.querySelector("#submitGroupMsg");
+const submitFinalBtn = document.querySelector("#submitFinalBtn");
+const submitFinalMsg = document.querySelector("#submitFinalMsg");
 
 const lockNotice = document.querySelector("#lockNotice");
 const lockedAt = document.querySelector("#lockedAt");
@@ -38,9 +39,6 @@ const bonusFourth = document.querySelector("#bonusFourth");
 const bonusSection = document.querySelector("#bonusSection");
 const groupsSection = document.querySelector("#groupsSection");
 const knockoutSection = document.querySelector("#knockoutSection");
-const submitSection = document.querySelector("#submitSection");
-const groupSubmitSlot = document.querySelector("#groupSubmitSlot");
-const finalSubmitSlot = document.querySelector("#finalSubmitSlot");
 const enableKickoffNotifBtn = document.querySelector("#enableKickoffNotif");
 const disableKickoffNotifBtn = document.querySelector("#disableKickoffNotif");
 const notifStatus = document.querySelector("#notifStatus");
@@ -61,6 +59,15 @@ let currentKnockout = {
   SF: {},
   THIRD: {},
   FINAL: {}
+};
+
+const ROUND_LABELS = {
+  R16: "16vos de final",
+  OCT: "8vos de final",
+  QF: "Cuartos de final",
+  SF: "Semifinales",
+  THIRD: "Tercer puesto",
+  FINAL: "Final"
 };
 
 function openModal({ title, text, confirmText = "Aceptar", cancelText = "Cancelar", showCancel = true }) {
@@ -234,6 +241,7 @@ function renderGroups(tournament, predictions, options = {}) {
 
 function renderKnockout(tournament) {
   const teams = computeRoundTeams(tournament.knockoutMatches.R16, currentKnockout);
+  knockoutWrap.classList.add("stack");
 
   knockoutWrap.innerHTML = ROUND_ORDER.map((round) => {
     const count = roundCount(round);
@@ -242,8 +250,11 @@ function renderKnockout(tournament) {
       const t = teams[round][i] || { home: "POR DEFINIR", away: "POR DEFINIR" };
       const kickoff = tournament.knockoutMatches?.[round]?.find((m) => m.id === matchId)?.kickoffAt;
       return `
-        <div class="match-line">
-          <span>${countryLabel(t.home)} vs ${countryLabel(t.away)}${kickoff ? ` · ${formatDate(kickoff)}` : ""}</span>
+        <div class="match-line" style="grid-template-columns:1fr auto auto;">
+          <span>${countryLabel(t.home)} vs ${countryLabel(t.away)}</span>
+          <div class="dt-cell">
+            <span class="dt-text">${kickoff ? formatDate(kickoff) : "Sin fecha"}</span>
+          </div>
           <div class="result-cell">
             <div class="result-row">
               <select data-round="${round}" data-match="${matchId}">
@@ -258,7 +269,16 @@ function renderKnockout(tournament) {
       `;
     });
 
-    return `<div class="group-box stack"><h3>${round}</h3>${lines.join("")}</div>`;
+    const roundLabel = ROUND_LABELS[round] ?? round;
+
+    return `
+      <details class="group-box">
+        <summary><strong>${roundLabel}</strong></summary>
+        <div class="stack" style="margin-top:8px;">
+          ${lines.join("")}
+        </div>
+      </details>
+    `;
   }).join("");
 
   knockoutWrap.querySelectorAll("select[data-round]").forEach((s) => {
@@ -295,12 +315,12 @@ function readFinalFormData() {
   };
 }
 
-function getMissingSelectionsCount() {
-  if (stage === "group") {
-    const selects = [...groupsWrap.querySelectorAll("select[data-group-match]")];
-    return selects.filter((s) => !s.value).length;
-  }
+function getMissingGroupSelectionsCount() {
+  const selects = [...groupsWrap.querySelectorAll("select[data-group-match]")];
+  return selects.filter((s) => !s.value).length;
+}
 
+function getMissingFinalSelectionsCount() {
   const selects = [...knockoutWrap.querySelectorAll("select[data-round]")];
   return selects.filter((s) => !s.value).length;
 }
@@ -326,6 +346,12 @@ function setReadOnlyMode(readOnly) {
   });
 }
 
+function setSectionReadOnly(section, readOnly) {
+  section.querySelectorAll("select, input, textarea").forEach((el) => {
+    el.disabled = readOnly;
+  });
+}
+
 function lockUI(lockedTime, stageLabel) {
   submitSection.style.display = "none";
   lockNotice.style.display = "block";
@@ -337,45 +363,38 @@ function applyStageLayout(participant) {
   setReadOnlyMode(false);
   lockNotice.style.display = "none";
   lockedAt.textContent = "";
-  submitSection.style.display = "block";
+  bonusSection.style.display = "block";
+  groupsSection.style.display = "block";
+  knockoutSection.style.display = "block";
 
-  const stageSubmitted = stage === "group"
-    ? Boolean(participant.predictions.groupLockedAt)
-    : Boolean(participant.predictions.finalLockedAt);
-  leaderboardSection.style.display = stageSubmitted ? "" : "none";
-  heroHint.style.display = stageSubmitted ? "none" : "";
+  const groupSubmitted = Boolean(participant.predictions.groupLockedAt);
+  const finalSubmitted = Boolean(participant.predictions.finalLockedAt);
+  leaderboardSection.style.display = (groupSubmitted || finalSubmitted) ? "" : "none";
+  heroHint.style.display = finalSubmitted ? "none" : "";
 
-  if (stage === "group") {
-    if (groupSubmitSlot && submitSection.parentElement !== groupSubmitSlot) {
-      groupSubmitSlot.appendChild(submitSection);
-    }
-    bonusSection.style.display = "block";
-    groupsSection.style.display = "block";
-    knockoutSection.style.display = "none";
-    submitBtn.textContent = "Enviar fase de grupos";
-
-    if (participant.predictions.groupLockedAt) {
-      lockUI(participant.predictions.groupLockedAt, "Fase de grupos");
-    }
+  submitGroupBtn.disabled = groupSubmitted;
+  if (groupSubmitted) {
+    setSectionReadOnly(bonusSection, true);
+    setSectionReadOnly(groupsSection, true);
+    submitGroupMsg.textContent = `Fase de grupos enviada: ${formatDate(participant.predictions.groupLockedAt)}.`;
   } else {
-    if (finalSubmitSlot && submitSection.parentElement !== finalSubmitSlot) {
-      finalSubmitSlot.appendChild(submitSection);
-    }
-    bonusSection.style.display = "none";
-    groupsSection.style.display = "none";
-    knockoutSection.style.display = "block";
-    submitBtn.textContent = "Enviar fase final";
+    submitGroupMsg.textContent = "";
+  }
 
-    if (!participant.predictions.groupLockedAt) {
-      submitSection.style.display = "none";
-      lockNotice.style.display = "block";
-      lockedAt.textContent = "Primero tenés que completar la fase de grupos.";
-      return;
-    }
+  if (!groupSubmitted) {
+    setSectionReadOnly(knockoutSection, true);
+    submitFinalBtn.disabled = true;
+    submitFinalMsg.textContent = "Primero completá y enviá la fase de grupos.";
+    return;
+  }
 
-    if (participant.predictions.finalLockedAt) {
-      lockUI(participant.predictions.finalLockedAt, "Fase final");
-    }
+  if (finalSubmitted) {
+    setSectionReadOnly(knockoutSection, true);
+    submitFinalBtn.disabled = true;
+    submitFinalMsg.textContent = `Fase final enviada: ${formatDate(participant.predictions.finalLockedAt)}.`;
+  } else {
+    submitFinalBtn.disabled = false;
+    submitFinalMsg.textContent = "";
   }
 }
 
@@ -414,12 +433,7 @@ async function load() {
   if (titleText) titleText.textContent = playerPageTitle;
   else title.textContent = playerPageTitle;
   document.title = playerPageTitle;
-  const alreadySubmitted = stage === "group"
-    ? Boolean(data.participant.predictions.groupLockedAt)
-    : Boolean(data.participant.predictions.finalLockedAt);
-  subtitle.textContent = alreadySubmitted
-    ? `Hola ${data.participant.name}.`
-    : `Hola ${data.participant.name}. ${stage === "group" ? "Completa fase de grupos + bonus." : "Completa fase final."}`;
+  subtitle.textContent = `Hola ${data.participant.name}. Completá grupos y luego fase final desde este mismo panel.`;
 
   currentKnockout = {
     R16: { ...(data.participant.predictions.knockout.R16 || {}) },
@@ -456,8 +470,8 @@ async function load() {
   await showNotificationOptinOnOpen();
 }
 
-submitBtn.addEventListener("click", async () => {
-  submitMsg.textContent = "";
+submitGroupBtn.addEventListener("click", async () => {
+  submitGroupMsg.textContent = "";
 
   const missingBonus = getMissingBonusLabels();
   if (missingBonus.length > 0) {
@@ -470,7 +484,7 @@ submitBtn.addEventListener("click", async () => {
     return;
   }
 
-  const missingCount = getMissingSelectionsCount();
+  const missingCount = getMissingGroupSelectionsCount();
   if (missingCount > 0) {
     await openModal({
       title: "Faltan resultados",
@@ -483,19 +497,16 @@ submitBtn.addEventListener("click", async () => {
 
   const confirmed = await openModal({
     title: "Confirmar envío",
-    text: `Vas a enviar la ${stage === "group" ? "fase de grupos" : "fase final"}. Después no vas a poder modificarla.`,
+    text: "Vas a enviar la fase de grupos. Después no vas a poder modificarla.",
     confirmText: "Sí, enviar",
     cancelText: "Cancelar"
   });
   if (!confirmed) return;
 
-  const endpoint = stage === "group" ? `/api/p/${token}/submit-group` : `/api/p/${token}/submit-final`;
-  const payload = stage === "group" ? readGroupFormData() : readFinalFormData();
-
-  const res = await fetch(endpoint, {
+  const res = await fetch(`/api/p/${token}/submit-group`, {
     method: "POST",
     headers: { "Content-Type": "application/json" },
-    body: JSON.stringify(payload)
+    body: JSON.stringify(readGroupFormData())
   });
   const data = await res.json();
 
@@ -509,7 +520,50 @@ submitBtn.addEventListener("click", async () => {
     return;
   }
 
-  submitMsg.textContent = `${stage === "group" ? "Fase de grupos" : "Fase final"} enviada y bloqueada.`;
+  submitGroupMsg.textContent = "Fase de grupos enviada y bloqueada.";
+  await load();
+});
+
+submitFinalBtn.addEventListener("click", async () => {
+  submitFinalMsg.textContent = "";
+
+  const missingCount = getMissingFinalSelectionsCount();
+  if (missingCount > 0) {
+    await openModal({
+      title: "Faltan resultados",
+      text: `Tenés ${missingCount} partido${missingCount === 1 ? "" : "s"} sin completar. Debés cargar todos los resultados antes de enviar.`,
+      confirmText: "Entendido",
+      showCancel: false
+    });
+    return;
+  }
+
+  const confirmed = await openModal({
+    title: "Confirmar envío",
+    text: "Vas a enviar la fase final. Después no vas a poder modificarla.",
+    confirmText: "Sí, enviar",
+    cancelText: "Cancelar"
+  });
+  if (!confirmed) return;
+
+  const res = await fetch(`/api/p/${token}/submit-final`, {
+    method: "POST",
+    headers: { "Content-Type": "application/json" },
+    body: JSON.stringify(readFinalFormData())
+  });
+  const data = await res.json();
+
+  if (!res.ok) {
+    await openModal({
+      title: "No se pudo enviar",
+      text: data.error ?? "No se pudo guardar",
+      confirmText: "Cerrar",
+      showCancel: false
+    });
+    return;
+  }
+
+  submitFinalMsg.textContent = "Fase final enviada y bloqueada.";
   await load();
 });
 

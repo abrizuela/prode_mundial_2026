@@ -1,4 +1,5 @@
 import type { KnockoutMatch, RoundKey, Tournament } from "./types.ts";
+import { FIXTURE_KICKOFFS } from "./fixture-kickoffs.ts";
 
 const GROUP_TEAMS: Record<string, [string, string, string, string]> = {
   A: ["Mexico", "Corea del Sur", "Sudafrica", "Republica Checa"],
@@ -7,7 +8,7 @@ const GROUP_TEAMS: Record<string, [string, string, string, string]> = {
   D: ["Estados Unidos", "Australia", "Paraguay", "Turquía"],
   E: ["Alemania", "Ecuador", "Costa de Marfil", "Curazao"],
   F: ["Países Bajos", "Japón", "Túnez", "Suecia"],
-  G: ["élgica", "Irán", "Egipto", "Nueva Zelanda"],
+  G: ["Bélgica", "Irán", "Egipto", "Nueva Zelanda"],
   H: ["Cabo Verde", "Arabia Saudita", "España", "Uruguay"],
   I: ["Francia", "Senegal", "Noruega", "Irak"],
   J: ["Argelia", "Argentina", "Austria", "Jordania"],
@@ -32,12 +33,13 @@ function buildGroupMatches() {
     ];
 
     pairings.forEach(([home, away], index) => {
+      const matchId = `G-${group}-${index + 1}`;
       matches.push({
-        id: `G-${group}-${index + 1}`,
+        id: matchId,
         group,
         home,
         away,
-        kickoffAt: null
+        kickoffAt: FIXTURE_KICKOFFS[matchId] ?? null
       });
     });
   }
