@@ -2,3 +2,4 @@ node_modules/
 dist/
 data/store.json
 .env
+Mejoras.md
