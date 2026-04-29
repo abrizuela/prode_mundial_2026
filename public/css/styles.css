@@ -353,6 +353,13 @@ button:disabled {
   min-width: 0;
 }
 
+.icon-btn.copy-btn {
+  background: transparent;
+  border: none;
+  border-radius: 0;
+  padding: 0;
+}
+
 .submit-inline {
   margin-top: 30px;
   margin-bottom: 30px;
