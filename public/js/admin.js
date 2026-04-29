@@ -51,6 +51,7 @@ let knockoutState = null;
 const flashTimers = new Map();
 let tournamentsCache = [];
 let customNotifSelectedTournaments = new Set();
+let customNotifSelectionInitialized = false;
 
 const ROUND_LABELS = {
   R16: "16vos de final",
@@ -61,8 +62,41 @@ const ROUND_LABELS = {
   FINAL: "Final"
 };
 
+const KNOCKOUT_MATCH_START = {
+  R16: 73,
+  OCT: 89,
+  QF: 97,
+  SF: 101,
+  THIRD: 103,
+  FINAL: 104
+};
+
 function roundLabel(round) {
   return ROUND_LABELS[round] ?? round;
+}
+
+function knockoutMatchNumber(round, index) {
+  const start = KNOCKOUT_MATCH_START[round];
+  if (typeof start !== "number") return null;
+  return start + index;
+}
+
+function groupMatchNumber(matchId) {
+  const parsed = /^G-([A-L])-(\d+)$/.exec(matchId ?? "");
+  if (!parsed) return null;
+  const groupIndex = parsed[1].charCodeAt(0) - 65;
+  const inGroupIndex = Number(parsed[2]);
+  if (groupIndex < 0 || Number.isNaN(inGroupIndex) || inGroupIndex < 1) return null;
+  return groupIndex * 6 + inGroupIndex;
+}
+
+function escapeHtml(value) {
+  return String(value)
+    .replaceAll("&", "&amp;")
+    .replaceAll("<", "&lt;")
+    .replaceAll(">", "&gt;")
+    .replaceAll('"', "&quot;")
+    .replaceAll("'", "&#39;");
 }
 
 function getAdminKey() {
@@ -159,7 +193,7 @@ function getMatchLabel(cell) {
   const row = cell.closest(".match-line");
   if (!row) return "Partido";
 
-  const staticTeams = row.querySelector("span")?.textContent?.trim();
+  const staticTeams = row.querySelector("[data-match-label]")?.textContent?.trim();
   if (staticTeams) return staticTeams;
 
   const home = row.querySelector("select[data-r16-home]")?.value?.trim() || "Local";
@@ -358,11 +392,11 @@ function renderCustomNotifSelector(tournaments) {
   tournamentsCache = tournaments;
   const ids = tournaments.map((t) => t.id);
 
-  if (!customNotifSelectedTournaments.size) {
-    customNotifSelectedTournaments = new Set(ids);
-  } else {
-    customNotifSelectedTournaments = new Set(ids.filter((id) => customNotifSelectedTournaments.has(id)));
+  if (!customNotifSelectionInitialized) {
+    customNotifSelectedTournaments = new Set();
+    customNotifSelectionInitialized = true;
   }
+  customNotifSelectedTournaments = new Set(ids.filter((id) => customNotifSelectedTournaments.has(id)));
 
   if (!tournaments.length) {
     customNotifSelector.innerHTML = '<p class="muted">No hay torneos para notificar.</p>';
@@ -424,7 +458,7 @@ function renderGlobalGroupSchedule(matches) {
           ${rows
             .map((m) => `
               <div class="match-line" style="grid-template-columns:1fr auto 60px;">
-                <span>${countryLabel(m.home)} vs ${countryLabel(m.away)}</span>
+                <span data-match-label>${groupMatchNumber(m.id) ? `Partido ${groupMatchNumber(m.id)} - ` : ""}${countryLabel(m.home)} vs ${countryLabel(m.away)}</span>
                 <div class="dt-cell">
                   <span class="dt-text">${formatKickoffDisplay(m.kickoffAt)}</span>
                   <button class="icon-btn" data-edit-kickoff type="button">Editar</button>
@@ -468,13 +502,29 @@ function countrySelect(opts) {
   return `<option value="">Dejar en blanco</option>${opts.map((x) => `<option value="${x}">${countryLabel(x)}</option>`).join("")}`;
 }
 
+function r16SelectOptions(currentValue, teams) {
+  const options = Array.isArray(teams) ? teams : [];
+  let html = "";
+
+  if (currentValue && !options.includes(currentValue)) {
+    const escapedCurrent = escapeHtml(currentValue);
+    html += `<option value="${escapedCurrent}">${escapeHtml(countryLabel(currentValue))}</option>`;
+  }
+
+  html += options
+    .map((team) => `<option value="${escapeHtml(team)}">${escapeHtml(countryLabel(team))}</option>`)
+    .join("");
+
+  return html;
+}
+
 function renderR16Editor(data) {
-  const options = countrySelect(data.teams || []);
   globalR16Editor.innerHTML = data.knockoutMatches.R16
-    .map((m) => `
-      <div class="match-line" style="grid-template-columns:1fr 1fr auto;">
-        <select data-r16-home="${m.id}">${options}</select>
-        <select data-r16-away="${m.id}">${options}</select>
+    .map((m, i) => `
+      <div class="match-line" style="grid-template-columns:auto 1fr 1fr auto;">
+        <span class="muted" style="font-weight:700; white-space:nowrap;">Partido ${knockoutMatchNumber("R16", i) ?? m.id}</span>
+        <select data-r16-home="${m.id}">${r16SelectOptions(m.home, data.teams || [])}</select>
+        <select data-r16-away="${m.id}">${r16SelectOptions(m.away, data.teams || [])}</select>
         <div class="dt-cell">
           <span class="dt-text">${formatKickoffDisplay(m.kickoffAt)}</span>
           <button class="icon-btn" data-edit-kickoff type="button">Editar</button>
@@ -507,12 +557,13 @@ function renderGlobalKnockout(data) {
     const count = roundCount(round);
     const lines = Array.from({ length: count }).map((_, i) => {
       const matchId = `${round}-${i + 1}`;
+      const matchNumber = knockoutMatchNumber(round, i);
       const teamLine = data.actualTeams?.[round]?.[i] ?? { home: "POR DEFINIR", away: "POR DEFINIR" };
       const result = data.actual?.knockout?.[round]?.[matchId] ?? "";
       const kickoff = data.knockoutMatches?.[round]?.find((m) => m.id === matchId)?.kickoffAt ?? null;
       return `
         <div class="match-line" style="grid-template-columns:1fr auto 60px;">
-          <span>${countryLabel(teamLine.home)} vs ${countryLabel(teamLine.away)}</span>
+          <span data-match-label>${matchNumber ? `Partido ${matchNumber} - ` : ""}${countryLabel(teamLine.home)} vs ${countryLabel(teamLine.away)}</span>
           <div class="dt-cell">
             <span class="dt-text">${formatKickoffDisplay(kickoff)}</span>
             <button class="icon-btn" data-edit-kickoff type="button">Editar</button>

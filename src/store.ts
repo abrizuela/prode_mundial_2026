@@ -2,7 +2,7 @@ import fs from "node:fs";
 import path from "node:path";
 import { buildInitialGroupMatches, buildInitialKnockoutMatches } from "./fixtures.ts";
 import { ROUND_ORDER } from "./types.ts";
-import type { GroupResult, KnockoutResult, RoundKey, Store, Tournament } from "./types.ts";
+import type { GroupResult, KnockoutMatch, KnockoutResult, RoundKey, Store, Tournament } from "./types.ts";
 
 const STORE_PATH = path.join(process.cwd(), "data", "store.json");
 
@@ -39,6 +39,39 @@ function emptyGlobalActual() {
   };
 }
 
+function normalizeKnockoutRound(
+  sourceRound: KnockoutMatch[] | undefined,
+  fallbackRound: KnockoutMatch[]
+) {
+  const source = sourceRound ?? fallbackRound;
+  const hasAnyKickoff = source.some((m) => typeof m.kickoffAt === "string" && m.kickoffAt.trim().length > 0);
+  const fallbackById = new Map(fallbackRound.map((m) => [m.id, m]));
+  const isLegacyPlaceholder = (team: string) => /^POR DEFINIR\b/i.test(team);
+
+  return source.map((m) => {
+    const fallback = fallbackById.get(m.id);
+    const normalizedKickoff = typeof m.kickoffAt === "string" ? m.kickoffAt : null;
+    const normalizedHome = typeof m.home === "string" ? m.home.trim() : "";
+    const normalizedAway = typeof m.away === "string" ? m.away.trim() : "";
+
+    if (hasAnyKickoff) {
+      return {
+        ...m,
+        home: !normalizedHome || isLegacyPlaceholder(normalizedHome) ? (fallback?.home ?? normalizedHome) : normalizedHome,
+        away: !normalizedAway || isLegacyPlaceholder(normalizedAway) ? (fallback?.away ?? normalizedAway) : normalizedAway,
+        kickoffAt: normalizedKickoff
+      };
+    }
+
+    return {
+      ...m,
+      home: !normalizedHome || isLegacyPlaceholder(normalizedHome) ? (fallback?.home ?? normalizedHome) : normalizedHome,
+      away: !normalizedAway || isLegacyPlaceholder(normalizedAway) ? (fallback?.away ?? normalizedAway) : normalizedAway,
+      kickoffAt: fallback?.kickoffAt ?? null
+    };
+  });
+}
+
 function normalizeStore(raw: unknown): Store {
   const obj = (raw ?? {}) as Partial<Store> & {
     tournaments?: Tournament[];
@@ -68,30 +101,30 @@ function normalizeStore(raw: unknown): Store {
   const fallbackKnockout = buildInitialKnockoutMatches();
   const firstTournamentKnockout = tournaments[0]?.knockoutMatches;
   const globalKnockoutMatches: Store["globalKnockoutMatches"] = {
-    R16: (obj.globalKnockoutMatches?.R16 ?? firstTournamentKnockout?.R16 ?? fallbackKnockout.R16).map((m) => ({
-      ...m,
-      kickoffAt: typeof m.kickoffAt === "string" ? m.kickoffAt : null
-    })),
-    OCT: (obj.globalKnockoutMatches?.OCT ?? firstTournamentKnockout?.OCT ?? fallbackKnockout.OCT).map((m) => ({
-      ...m,
-      kickoffAt: typeof m.kickoffAt === "string" ? m.kickoffAt : null
-    })),
-    QF: (obj.globalKnockoutMatches?.QF ?? firstTournamentKnockout?.QF ?? fallbackKnockout.QF).map((m) => ({
-      ...m,
-      kickoffAt: typeof m.kickoffAt === "string" ? m.kickoffAt : null
-    })),
-    SF: (obj.globalKnockoutMatches?.SF ?? firstTournamentKnockout?.SF ?? fallbackKnockout.SF).map((m) => ({
-      ...m,
-      kickoffAt: typeof m.kickoffAt === "string" ? m.kickoffAt : null
-    })),
-    THIRD: (obj.globalKnockoutMatches?.THIRD ?? firstTournamentKnockout?.THIRD ?? fallbackKnockout.THIRD).map((m) => ({
-      ...m,
-      kickoffAt: typeof m.kickoffAt === "string" ? m.kickoffAt : null
-    })),
-    FINAL: (obj.globalKnockoutMatches?.FINAL ?? firstTournamentKnockout?.FINAL ?? fallbackKnockout.FINAL).map((m) => ({
-      ...m,
-      kickoffAt: typeof m.kickoffAt === "string" ? m.kickoffAt : null
-    }))
+    R16: normalizeKnockoutRound(
+      obj.globalKnockoutMatches?.R16 ?? firstTournamentKnockout?.R16,
+      fallbackKnockout.R16
+    ),
+    OCT: normalizeKnockoutRound(
+      obj.globalKnockoutMatches?.OCT ?? firstTournamentKnockout?.OCT,
+      fallbackKnockout.OCT
+    ),
+    QF: normalizeKnockoutRound(
+      obj.globalKnockoutMatches?.QF ?? firstTournamentKnockout?.QF,
+      fallbackKnockout.QF
+    ),
+    SF: normalizeKnockoutRound(
+      obj.globalKnockoutMatches?.SF ?? firstTournamentKnockout?.SF,
+      fallbackKnockout.SF
+    ),
+    THIRD: normalizeKnockoutRound(
+      obj.globalKnockoutMatches?.THIRD ?? firstTournamentKnockout?.THIRD,
+      fallbackKnockout.THIRD
+    ),
+    FINAL: normalizeKnockoutRound(
+      obj.globalKnockoutMatches?.FINAL ?? firstTournamentKnockout?.FINAL,
+      fallbackKnockout.FINAL
+    )
   };
 
   for (const tournament of tournaments) {

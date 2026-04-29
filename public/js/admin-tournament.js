@@ -15,6 +15,10 @@ const renameTournamentModal = document.querySelector("#renameTournamentModal");
 const renameTournamentInput = document.querySelector("#renameTournamentInput");
 const renameTournamentCancel = document.querySelector("#renameTournamentCancel");
 const renameTournamentSave = document.querySelector("#renameTournamentSave");
+const renameParticipantModal = document.querySelector("#renameParticipantModal");
+const renameParticipantInput = document.querySelector("#renameParticipantInput");
+const renameParticipantCancel = document.querySelector("#renameParticipantCancel");
+const renameParticipantSave = document.querySelector("#renameParticipantSave");
 
 const adminKeyInput = document.querySelector("#adminKey");
 const saveAdminKeyBtn = document.querySelector("#saveAdminKey");
@@ -29,6 +33,7 @@ const modalOk = document.querySelector("#modalOk");
 
 const ADMIN_KEY_STORAGE = "prode_admin_key";
 let currentTournamentName = "";
+let currentParticipantId = "";
 
 function openModal({ title, text, confirmText = "Aceptar", cancelText = "Cancelar" }) {
   modalTitle.textContent = title;
@@ -117,25 +122,26 @@ function renderParticipants(tournament) {
 
   const participantsHtml = tournament.participants
     .map((p) => {
+      const canUnlockGroup = Boolean(p.groupLockedAt);
+      const canUnlockFinal = Boolean(p.finalLockedAt);
       const url = `${window.location.origin}${p.playerUrl || p.groupUrl}`;
       return `
       <div class="group-box stack" data-participant-id="${p.id}">
         <div class="stack">
-          <span>
+          <div class="row" style="align-items:center; gap:8px;">
             <strong>${p.name}</strong>
+            <button class="icon-btn" data-action="open-rename-participant" type="button" aria-label="Cambiar nombre del participante">✎</button>
             ${p.groupLockedAt ? "<span class='tag'>Grupos enviado</span>" : ""}
             ${p.finalLockedAt ? "<span class='tag'>Final enviado</span>" : ""}
-          </span>
+          </div>
           <div class="row" style="align-items:center;gap:0.5rem;">
             <a href="${p.playerUrl || p.groupUrl}" target="_blank" rel="noreferrer">${url}</a>
             <button class="icon-btn copy-btn" data-copy="${url}" aria-label="Copiar link"><img src="/assets/copy.png" alt="" width="14" height="14" /></button>
           </div>
         </div>
         <div class="row">
-          <input data-participant-name value="${p.name}" />
-          <button data-action="rename-participant">Guardar nombre</button>
-          <button class='secondary' data-action='unlock-group'>Habilitar grupos</button>
-          <button class='secondary' data-action='unlock-final'>Habilitar fase final</button>
+          <button class='secondary' data-action='unlock-group' ${canUnlockGroup ? "" : "disabled"}>Habilitar edición Fase de Grupos</button>
+          <button class='secondary' data-action='unlock-final' ${canUnlockFinal ? "" : "disabled"}>Habilitar edición Fase Final</button>
           <button class="danger" data-action="delete-participant">Eliminar</button>
         </div>
       </div>
@@ -154,21 +160,17 @@ function renderParticipants(tournament) {
     ${participantsHtml}
   `;
 
-  links.querySelectorAll("button[data-action='rename-participant']").forEach((btn) => {
-    btn.addEventListener("click", async () => {
+  links.querySelectorAll("button[data-action='open-rename-participant']").forEach((btn) => {
+    btn.addEventListener("click", () => {
       const card = btn.closest("[data-participant-id]");
-      const participantId = card?.dataset.participantId;
-      const name = card?.querySelector("input[data-participant-name]")?.value?.trim() ?? "";
-      if (!participantId || !name) return;
+      const participantId = card?.dataset.participantId ?? "";
+      const participantName = card?.querySelector("strong")?.textContent?.trim() ?? "";
+      if (!participantId) return;
 
-      const res = await fetch(`/api/tournaments/${tournamentId}/participants/${participantId}`, {
-        method: "PATCH",
-        headers: adminHeaders({ "Content-Type": "application/json" }),
-        body: JSON.stringify({ name })
-      });
-
-      if (!res.ok) return;
-      await load();
+      currentParticipantId = participantId;
+      renameParticipantInput.value = participantName;
+      renameParticipantModal.classList.remove("hidden");
+      renameParticipantInput.focus();
     });
   });
 
@@ -197,12 +199,13 @@ function renderParticipants(tournament) {
 
   links.querySelectorAll("button[data-action='unlock-group']").forEach((btn) => {
     btn.addEventListener("click", async () => {
+      if (btn.disabled) return;
       const card = btn.closest("[data-participant-id]");
       const participantId = card?.dataset.participantId;
       if (!participantId) return;
 
       const confirmed = await openModal({
-        title: "Habilitar grupos",
+        title: "Habilitar edición Fase de Grupos",
         text: "Se habilitará nuevamente la fase de grupos para este participante.",
         confirmText: "Habilitar"
       });
@@ -229,12 +232,13 @@ function renderParticipants(tournament) {
 
   links.querySelectorAll("button[data-action='unlock-final']").forEach((btn) => {
     btn.addEventListener("click", async () => {
+      if (btn.disabled) return;
       const card = btn.closest("[data-participant-id]");
       const participantId = card?.dataset.participantId;
       if (!participantId) return;
 
       const confirmed = await openModal({
-        title: "Habilitar fase final",
+        title: "Habilitar edición Fase Final",
         text: "Se habilitará nuevamente la fase final para este participante.",
         confirmText: "Habilitar"
       });
@@ -321,6 +325,27 @@ renameTournamentSave.addEventListener("click", async () => {
 
   if (!res.ok) return;
   renameTournamentModal.classList.add("hidden");
+  await load();
+});
+
+renameParticipantCancel.addEventListener("click", () => {
+  renameParticipantModal.classList.add("hidden");
+  currentParticipantId = "";
+});
+
+renameParticipantSave.addEventListener("click", async () => {
+  const name = renameParticipantInput.value.trim();
+  if (!currentParticipantId || !name) return;
+
+  const res = await fetch(`/api/tournaments/${tournamentId}/participants/${currentParticipantId}`, {
+    method: "PATCH",
+    headers: adminHeaders({ "Content-Type": "application/json" }),
+    body: JSON.stringify({ name })
+  });
+
+  if (!res.ok) return;
+  renameParticipantModal.classList.add("hidden");
+  currentParticipantId = "";
   await load();
 });
 

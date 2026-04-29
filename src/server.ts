@@ -369,13 +369,10 @@ app.patch("/api/admin/knockout/r16", requireAdmin, (req, res) => {
     const custom = byId.get(m.id);
     if (!custom) return m;
 
-    const defaultHome = `POR DEFINIR ${m.index * 2 + 1}`;
-    const defaultAway = `POR DEFINIR ${m.index * 2 + 2}`;
-
     return {
       ...m,
-      home: custom.home || defaultHome,
-      away: custom.away || defaultAway,
+      home: custom.home || m.home,
+      away: custom.away || m.away,
       kickoffAt: custom.kickoffAt
     };
   });

@@ -17,6 +17,54 @@ function pickLoser(home: string, away: string, result: "L" | "V" | undefined) {
   return result === "L" ? away : home;
 }
 
+const KNOCKOUT_MATCH_START: Partial<Record<RoundKey, number>> = {
+  R16: 73,
+  OCT: 89,
+  QF: 97,
+  SF: 101,
+  THIRD: 103,
+  FINAL: 104
+};
+
+function knockoutMatchNumber(round: RoundKey, index: number) {
+  const start = KNOCKOUT_MATCH_START[round];
+  if (typeof start !== "number") return null;
+  return start + index;
+}
+
+function winnerPlaceholder(round: RoundKey, index: number) {
+  const n = knockoutMatchNumber(round, index);
+  return n ? `GANADOR Partido ${n}` : `GANADOR ${round}-${index + 1}`;
+}
+
+function loserPlaceholder(round: RoundKey, index: number) {
+  const n = knockoutMatchNumber(round, index);
+  return n ? `PERDEDOR Partido ${n}` : `PERDEDOR ${round}-${index + 1}`;
+}
+
+const OCT_FROM_R16: [number, number][] = [
+  [1, 4], // Partido 89: ganador 74 vs ganador 77
+  [0, 2], // Partido 90: ganador 73 vs ganador 75
+  [3, 5], // Partido 91: ganador 76 vs ganador 78
+  [6, 7], // Partido 92: ganador 79 vs ganador 80
+  [10, 11], // Partido 93: ganador 83 vs ganador 84
+  [8, 9], // Partido 94: ganador 81 vs ganador 82
+  [13, 15], // Partido 95: ganador 86 vs ganador 88
+  [12, 14] // Partido 96: ganador 85 vs ganador 87
+];
+
+const QF_FROM_OCT: [number, number][] = [
+  [0, 1], // Partido 97: ganador 89 vs ganador 90
+  [4, 5], // Partido 98: ganador 93 vs ganador 94
+  [2, 3], // Partido 99: ganador 91 vs ganador 92
+  [6, 7] // Partido 100: ganador 95 vs ganador 96
+];
+
+const SF_FROM_QF: [number, number][] = [
+  [0, 1], // Partido 101: ganador 97 vs ganador 98
+  [2, 3] // Partido 102: ganador 99 vs ganador 100
+];
+
 export function computeRoundTeams(
   r16Base: Tournament["knockoutMatches"]["R16"],
   picks: Tournament["actual"]["knockout"]
@@ -31,26 +79,29 @@ export function computeRoundTeams(
   };
 
   const r16Winners = teams.R16.map((m, i) => pickWinner(m.home, m.away, picks.R16[`R16-${i + 1}`]));
-  for (let i = 0; i < 8; i++) {
+  for (let i = 0; i < OCT_FROM_R16.length; i++) {
+    const [leftSource, rightSource] = OCT_FROM_R16[i];
     teams.OCT.push({
-      home: r16Winners[i * 2] ?? `POR DEFINIR R16-${i * 2 + 1}`,
-      away: r16Winners[i * 2 + 1] ?? `POR DEFINIR R16-${i * 2 + 2}`
+      home: r16Winners[leftSource] ?? winnerPlaceholder("R16", leftSource),
+      away: r16Winners[rightSource] ?? winnerPlaceholder("R16", rightSource)
     });
   }
 
   const octWinners = teams.OCT.map((m, i) => pickWinner(m.home, m.away, picks.OCT[`OCT-${i + 1}`]));
-  for (let i = 0; i < 4; i++) {
+  for (let i = 0; i < QF_FROM_OCT.length; i++) {
+    const [leftSource, rightSource] = QF_FROM_OCT[i];
     teams.QF.push({
-      home: octWinners[i * 2] ?? `POR DEFINIR OCT-${i * 2 + 1}`,
-      away: octWinners[i * 2 + 1] ?? `POR DEFINIR OCT-${i * 2 + 2}`
+      home: octWinners[leftSource] ?? winnerPlaceholder("OCT", leftSource),
+      away: octWinners[rightSource] ?? winnerPlaceholder("OCT", rightSource)
     });
   }
 
   const qfWinners = teams.QF.map((m, i) => pickWinner(m.home, m.away, picks.QF[`QF-${i + 1}`]));
-  for (let i = 0; i < 2; i++) {
+  for (let i = 0; i < SF_FROM_QF.length; i++) {
+    const [leftSource, rightSource] = SF_FROM_QF[i];
     teams.SF.push({
-      home: qfWinners[i * 2] ?? `POR DEFINIR QF-${i * 2 + 1}`,
-      away: qfWinners[i * 2 + 1] ?? `POR DEFINIR QF-${i * 2 + 2}`
+      home: qfWinners[leftSource] ?? winnerPlaceholder("QF", leftSource),
+      away: qfWinners[rightSource] ?? winnerPlaceholder("QF", rightSource)
     });
   }
 
@@ -58,13 +109,13 @@ export function computeRoundTeams(
   const sfLosers = teams.SF.map((m, i) => pickLoser(m.home, m.away, picks.SF[`SF-${i + 1}`]));
 
   teams.THIRD.push({
-    home: sfLosers[0] ?? "POR DEFINIR SF-1",
-    away: sfLosers[1] ?? "POR DEFINIR SF-2"
+    home: sfLosers[0] ?? loserPlaceholder("SF", 0),
+    away: sfLosers[1] ?? loserPlaceholder("SF", 1)
   });
 
   teams.FINAL.push({
-    home: sfWinners[0] ?? "POR DEFINIR SF-1",
-    away: sfWinners[1] ?? "POR DEFINIR SF-2"
+    home: sfWinners[0] ?? winnerPlaceholder("SF", 0),
+    away: sfWinners[1] ?? winnerPlaceholder("SF", 1)
   });
 
   return teams;
@@ -83,22 +134,22 @@ function getMatchId(round: RoundKey, index: number): string {
   return `${round}-${index + 1}`;
 }
 
+function getPreviousMatchIndexes(round: RoundKey, matchIndex: number): number[] {
+  if (round === "OCT") return [...(OCT_FROM_R16[matchIndex] ?? [])];
+  if (round === "QF") return [...(QF_FROM_OCT[matchIndex] ?? [])];
+  if (round === "SF") return [...(SF_FROM_QF[matchIndex] ?? [])];
+  if (round === "THIRD" || round === "FINAL") return [0, 1];
+  return [];
+}
+
 function getPrevIndexForWinner(round: RoundKey, matchIndex: number, winnerTeam: string, prevMatches: { home: string; away: string }[]) {
-  if (round === "THIRD" || round === "FINAL") {
-    const first = prevMatches[0];
-    const second = prevMatches[1];
-    if (first && (first.home === winnerTeam || first.away === winnerTeam)) return 0;
-    if (second && (second.home === winnerTeam || second.away === winnerTeam)) return 1;
-    return null;
+  const indexes = getPreviousMatchIndexes(round, matchIndex);
+  for (const index of indexes) {
+    const prev = prevMatches[index];
+    if (prev && (prev.home === winnerTeam || prev.away === winnerTeam)) {
+      return index;
+    }
   }
-
-  const leftIndex = matchIndex * 2;
-  const rightIndex = (matchIndex * 2) + 1;
-  const left = prevMatches[leftIndex];
-  const right = prevMatches[rightIndex];
-
-  if (left && (left.home === winnerTeam || left.away === winnerTeam)) return leftIndex;
-  if (right && (right.home === winnerTeam || right.away === winnerTeam)) return rightIndex;
   return null;
 }
 

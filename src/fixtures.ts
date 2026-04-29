@@ -103,6 +103,25 @@ const GROUP_MATCH_PAIRS: Record<string, Array<[string, string]>> = {
 
 const GROUP_IDS = Object.keys(GROUP_MATCH_PAIRS);
 
+const R16_CANDIDATES: Array<{ home: string; away: string }> = [
+  { home: "2º Grupo A", away: "2º Grupo B" },
+  { home: "1º Grupo E", away: "3º Grupo A/B/C/D/F" },
+  { home: "1º Grupo F", away: "2º Grupo C" },
+  { home: "1º Grupo C", away: "2º Grupo F" },
+  { home: "1º Grupo I", away: "3º Grupo C/D/F/G/H" },
+  { home: "2º Grupo E", away: "2º Grupo I" },
+  { home: "1º Grupo A", away: "3º Grupo C/E/F/H/I" },
+  { home: "1º Grupo L", away: "3º Grupo E/H/I/J/K" },
+  { home: "1º Grupo D", away: "3º Grupo B/E/F/I/J" },
+  { home: "1º Grupo G", away: "3º Grupo A/E/H/I/J" },
+  { home: "2º Grupo K", away: "2º Grupo L" },
+  { home: "1º Grupo H", away: "2º Grupo J" },
+  { home: "1º Grupo B", away: "3º Grupo E/F/G/I/J" },
+  { home: "1º Grupo J", away: "2º Grupo H" },
+  { home: "1º Grupo K", away: "3º Grupo D/E/I/J/L" },
+  { home: "2º Grupo D", away: "2º Grupo G" }
+];
+
 function buildGroupMatches() {
   const matches = [] as Tournament["groupMatches"];
 
@@ -141,8 +160,8 @@ export function buildInitialKnockoutMatches(): Tournament["knockoutMatches"] {
       id: `R16-${i + 1}`,
       round: "R16",
       index: i,
-      home: `POR DEFINIR ${i * 2 + 1}`,
-      away: `POR DEFINIR ${i * 2 + 2}`,
+      home: R16_CANDIDATES[i]?.home ?? `POR DEFINIR ${i * 2 + 1}`,
+      away: R16_CANDIDATES[i]?.away ?? `POR DEFINIR ${i * 2 + 2}`,
       kickoffAt: KNOCKOUT_KICKOFFS[`R16-${i + 1}`] ?? null
     })),
     OCT: createRound("OCT", 8, "OCT"),
