@@ -61,6 +61,7 @@ export type Tournament = {
 export type Store = {
   tournaments: Tournament[];
   globalGroupKickoffAt: Record<string, string | null>;
+  finalStageEnabled: boolean;
   globalKnockoutMatches: Record<RoundKey, KnockoutMatch[]>;
   globalActual: {
     group: Record<string, GroupResult>;

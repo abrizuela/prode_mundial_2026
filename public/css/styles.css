@@ -142,6 +142,10 @@ button.danger {
   background: linear-gradient(130deg, #c0392b, #e74c3c);
 }
 
+#toggleFinalStageEnabled {
+  background: linear-gradient(130deg, #3b82f6, #2563eb);
+}
+
 a.btn-primary {
   display: inline-block;
   border-radius: 999px;
@@ -156,6 +160,21 @@ a.btn-primary {
 button:disabled {
   opacity: 0.55;
   cursor: not-allowed;
+}
+
+.notif-tournament-row {
+  display: flex;
+  align-items: center;
+  justify-content: flex-start;
+  gap: 10px;
+}
+
+.notif-tournament-row input[type="checkbox"] {
+  width: auto;
+  margin: 0;
+  padding: 0;
+  border: 0;
+  background: transparent;
 }
 
 .stack {
@@ -222,6 +241,37 @@ button:disabled {
   color: var(--accent);
   padding: 3px 8px;
   font-weight: 700;
+}
+
+.status-chip {
+  display: inline-block;
+  border-radius: 999px;
+  border: 1px solid transparent;
+  font-weight: 700;
+  font-size: 0.78rem;
+  line-height: 1;
+  padding: 4px 10px;
+}
+
+.status-chip.is-on,
+.status-chip.is-granted {
+  color: #1f7a3f;
+  background: #dff6e7;
+  border-color: #a7dfbe;
+}
+
+.status-chip.is-off,
+.status-chip.is-denied {
+  color: #a62d2d;
+  background: #fde4e4;
+  border-color: #efb2b2;
+}
+
+.status-chip.is-pending,
+.status-chip.is-neutral {
+  color: #7a5a22;
+  background: #fff2d9;
+  border-color: #f0d6a4;
 }
 
 .notice {

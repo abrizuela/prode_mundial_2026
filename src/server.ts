@@ -280,11 +280,71 @@ app.get("/api/admin/knockout", requireAdmin, (_req, res) => {
   const actualTeams = computeRoundTeams(proxyTournament.knockoutMatches.R16, proxyTournament.actual.knockout);
   const bonusFinal = deriveBonusFinal(proxyTournament);
   res.json({
+    finalStageEnabled: store.finalStageEnabled,
     knockoutMatches: store.globalKnockoutMatches,
     actual: store.globalActual,
     actualTeams,
     bonusFinal,
     teams: listCompetingTeams()
+  });
+});
+
+app.patch("/api/admin/knockout/final-stage-enabled", requireAdmin, (req, res) => {
+  void (async () => {
+    let store = readStore();
+    const enabled = Boolean(req.body?.enabled);
+    const wasEnabled = Boolean(store.finalStageEnabled);
+    store.finalStageEnabled = enabled;
+
+    let notifiedCount = 0;
+
+    if (enabled && !wasEnabled) {
+      store = configureWebPush(store);
+
+      for (const tournament of store.tournaments) {
+        for (const participant of tournament.participants) {
+          if (!participant.predictions.groupLockedAt || participant.predictions.finalLockedAt) {
+            continue;
+          }
+
+          const token = participant.token;
+          const subscriptions = store.pushState.subscriptionsByToken[token] ?? [];
+          if (!subscriptions.length) continue;
+
+          const payload = JSON.stringify({
+            title: "PRODE Mundial 2026",
+            body: `${tournament.name}: ya podés completar la fase final`,
+            url: `/p/${token}/final`
+          });
+
+          const aliveSubs: typeof subscriptions = [];
+          let delivered = false;
+
+          for (const sub of subscriptions) {
+            try {
+              await webpush.sendNotification(sub, payload);
+              aliveSubs.push(sub);
+              delivered = true;
+            } catch (error: unknown) {
+              const statusCode = isObject(error) && typeof error.statusCode === "number" ? error.statusCode : 0;
+              if (statusCode !== 404 && statusCode !== 410) {
+                aliveSubs.push(sub);
+              }
+            }
+          }
+
+          store.pushState.subscriptionsByToken[token] = aliveSubs;
+          if (delivered) {
+            notifiedCount += 1;
+          }
+        }
+      }
+    }
+
+    writeStore(store);
+    res.json({ ok: true, finalStageEnabled: store.finalStageEnabled, notifiedCount });
+  })().catch(() => {
+    res.status(500).json({ error: "No se pudo actualizar el estado de fase final" });
   });
 });
 
@@ -301,15 +361,23 @@ app.patch("/api/admin/knockout/r16", requireAdmin, (req, res) => {
     const kickoffAtRaw = typeof typedRow.kickoffAt === "string" ? typedRow.kickoffAt.trim() : "";
     const parsedKickoff = kickoffAtRaw ? new Date(kickoffAtRaw) : null;
     const kickoffAt = parsedKickoff && !Number.isNaN(parsedKickoff.getTime()) ? parsedKickoff.toISOString() : null;
-    if (id && home && away) {
-      byId.set(id, { home, away, kickoffAt });
-    }
+    if (!id) return;
+    byId.set(id, { home, away, kickoffAt });
   });
 
   store.globalKnockoutMatches.R16 = store.globalKnockoutMatches.R16.map((m) => {
     const custom = byId.get(m.id);
     if (!custom) return m;
-    return { ...m, home: custom.home, away: custom.away, kickoffAt: custom.kickoffAt };
+
+    const defaultHome = `POR DEFINIR ${m.index * 2 + 1}`;
+    const defaultAway = `POR DEFINIR ${m.index * 2 + 2}`;
+
+    return {
+      ...m,
+      home: custom.home || defaultHome,
+      away: custom.away || defaultAway,
+      kickoffAt: custom.kickoffAt
+    };
   });
 
   store.tournaments = store.tournaments.map((t) => ({
@@ -396,6 +464,87 @@ app.patch("/api/admin/knockout/results", requireAdmin, (req, res) => {
 
   writeStore(store);
   res.json({ ok: true });
+});
+
+app.post("/api/admin/notifications/custom", requireAdmin, (req, res) => {
+  void (async () => {
+    let store = configureWebPush(readStore());
+
+    const title = typeof req.body?.title === "string" ? req.body.title.trim() : "";
+    const body = typeof req.body?.body === "string" ? req.body.body.trim() : "";
+    const rawUrl = typeof req.body?.url === "string" ? req.body.url.trim() : "";
+    const hasTournamentFilter = Array.isArray(req.body?.tournamentIds);
+    const tournamentIds = hasTournamentFilter
+      ? req.body.tournamentIds
+          .filter((v: unknown) => typeof v === "string")
+          .map((v: string) => v.trim())
+          .filter((v: string) => v.length > 0)
+      : [];
+    const selectedTournamentIds = new Set(tournamentIds);
+
+    if (!title || !body) {
+      res.status(400).json({ error: "Título y mensaje son obligatorios" });
+      return;
+    }
+
+    const selectedTournaments = store.tournaments.filter((t) => {
+      if (!hasTournamentFilter) return true;
+      return selectedTournamentIds.has(t.id);
+    });
+
+    let sentNotifications = 0;
+    let deliveredParticipants = 0;
+
+    for (const tournament of selectedTournaments) {
+      for (const participant of tournament.participants) {
+        const token = participant.token;
+        const subscriptions = store.pushState.subscriptionsByToken[token] ?? [];
+        if (!subscriptions.length) continue;
+
+        const url = (() => {
+          if (!rawUrl) return `/p/${token}`;
+          const templated = rawUrl.replace(/\{token\}/g, token);
+          if (templated.startsWith("http://") || templated.startsWith("https://") || templated.startsWith("/")) {
+            return templated;
+          }
+          return `/${templated}`;
+        })();
+
+        const payload = JSON.stringify({ title, body, url });
+        const aliveSubs: typeof subscriptions = [];
+        let deliveredToParticipant = false;
+
+        for (const sub of subscriptions) {
+          try {
+            await webpush.sendNotification(sub, payload);
+            aliveSubs.push(sub);
+            sentNotifications += 1;
+            deliveredToParticipant = true;
+          } catch (error: unknown) {
+            const statusCode = isObject(error) && typeof error.statusCode === "number" ? error.statusCode : 0;
+            if (statusCode !== 404 && statusCode !== 410) {
+              aliveSubs.push(sub);
+            }
+          }
+        }
+
+        store.pushState.subscriptionsByToken[token] = aliveSubs;
+        if (deliveredToParticipant) {
+          deliveredParticipants += 1;
+        }
+      }
+    }
+
+    writeStore(store);
+    res.json({
+      ok: true,
+      selectedTournamentCount: selectedTournaments.length,
+      deliveredParticipants,
+      sentNotifications
+    });
+  })().catch(() => {
+    res.status(500).json({ error: "No se pudo enviar la notificación" });
+  });
 });
 
 app.get("/api/push/public-key", (_req, res) => {
@@ -787,6 +936,7 @@ app.get("/api/p/:token", (req, res) => {
     tournament: {
       id: tournament.id,
       name: tournament.name,
+      finalStageEnabled: store.finalStageEnabled,
       groupMatches: tournament.groupMatches,
       knockoutMatches: tournament.knockoutMatches,
       actual: tournament.actual,
@@ -917,8 +1067,8 @@ app.post("/api/p/:token/submit-final", (req, res) => {
     return;
   }
 
-  if (!isR16Defined(store.globalKnockoutMatches.R16)) {
-    res.status(409).json({ error: "La fase final todavía no está habilitada: primero el admin debe definir los cruces de 16vos" });
+  if (!store.finalStageEnabled) {
+    res.status(409).json({ error: "La fase final todavía no está habilitada por el admin" });
     return;
   }
 

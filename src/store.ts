@@ -43,6 +43,7 @@ function normalizeStore(raw: unknown): Store {
   const obj = (raw ?? {}) as Partial<Store> & {
     tournaments?: Tournament[];
     globalGroupKickoffAt?: Record<string, string | null>;
+    finalStageEnabled?: boolean;
     globalKnockoutMatches?: Store["globalKnockoutMatches"];
     globalActual?: Store["globalActual"];
     pushState?: Store["pushState"];
@@ -133,6 +134,7 @@ function normalizeStore(raw: unknown): Store {
   return {
     tournaments,
     globalGroupKickoffAt,
+    finalStageEnabled: obj.finalStageEnabled ?? false,
     globalKnockoutMatches,
     globalActual,
     pushState

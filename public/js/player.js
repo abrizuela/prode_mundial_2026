@@ -112,13 +112,26 @@ function setNotificationsEnabled(value) {
 
 function refreshNotificationStatus() {
   if (!notificationsSupported()) {
-    notifStatus.textContent = "Este navegador no soporta notificaciones push en segundo plano.";
+    notifStatus.innerHTML = "Estado: <span class=\"status-chip is-neutral\">No disponible</span>";
     return;
   }
 
-  const permission = Notification.permission=== "granted" ? "Concedido" : "Rechazado";
+  const permissionState = Notification.permission;
+  const permission = permissionState === "granted"
+    ? "Concedido"
+    : permissionState === "denied"
+      ? "Rechazado"
+      : "Pendiente";
+  const permissionClass = permissionState === "granted"
+    ? "is-granted"
+    : permissionState === "denied"
+      ? "is-denied"
+      : "is-pending";
+
   const status = notificationsEnabled() ? "Activadas" : "Desactivadas";
-  notifStatus.textContent = `Estado: ${status} · Permiso: ${permission}`;
+  const statusClass = notificationsEnabled() ? "is-on" : "is-off";
+
+  notifStatus.innerHTML = `Estado: <span class="status-chip ${statusClass}">${status}</span> · Permiso: <span class="status-chip ${permissionClass}">${permission}</span>`;
 }
 
 function urlBase64ToUint8Array(base64String) {
@@ -239,8 +252,11 @@ function renderGroups(tournament, predictions, options = {}) {
     .join("");
 }
 
-function renderKnockout(tournament) {
+function renderKnockout(tournament, openRounds) {
   const teams = computeRoundTeams(tournament.knockoutMatches.R16, currentKnockout);
+  const keptOpenRounds = openRounds ?? new Set(
+    [...knockoutWrap.querySelectorAll("details[data-round][open]")].map((el) => el.dataset.round)
+  );
   knockoutWrap.classList.add("stack");
 
   knockoutWrap.innerHTML = ROUND_ORDER.map((round) => {
@@ -272,7 +288,7 @@ function renderKnockout(tournament) {
     const roundLabel = ROUND_LABELS[round] ?? round;
 
     return `
-      <details class="group-box">
+      <details class="group-box" data-round="${round}" ${keptOpenRounds.has(round) ? "open" : ""}>
         <summary><strong>${roundLabel}</strong></summary>
         <div class="stack" style="margin-top:8px;">
           ${lines.join("")}
@@ -285,10 +301,14 @@ function renderKnockout(tournament) {
     s.addEventListener("change", () => {
       const round = s.dataset.round;
       const match = s.dataset.match;
+      const nextOpenRounds = new Set(
+        [...knockoutWrap.querySelectorAll("details[data-round][open]")].map((el) => el.dataset.round)
+      );
       if (!currentKnockout[round]) currentKnockout[round] = {};
       if (s.value) currentKnockout[round][match] = s.value;
       else delete currentKnockout[round][match];
-      renderKnockout(tournament);
+      nextOpenRounds.add(round);
+      renderKnockout(tournament, nextOpenRounds);
     });
   });
 }
@@ -369,6 +389,7 @@ function applyStageLayout(participant) {
 
   const groupSubmitted = Boolean(participant.predictions.groupLockedAt);
   const finalSubmitted = Boolean(participant.predictions.finalLockedAt);
+  const finalStageEnabled = Boolean(state?.tournament?.finalStageEnabled);
   leaderboardSection.style.display = (groupSubmitted || finalSubmitted) ? "" : "none";
   heroHint.style.display = finalSubmitted ? "none" : "";
 
@@ -385,6 +406,13 @@ function applyStageLayout(participant) {
     setSectionReadOnly(knockoutSection, true);
     submitFinalBtn.disabled = true;
     submitFinalMsg.textContent = "Primero completá y enviá la fase de grupos.";
+    return;
+  }
+
+  if (!finalStageEnabled) {
+    setSectionReadOnly(knockoutSection, true);
+    submitFinalBtn.disabled = true;
+    submitFinalMsg.textContent = "La fase final todavía no está habilitada.";
     return;
   }
 

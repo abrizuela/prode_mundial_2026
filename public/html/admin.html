@@ -33,6 +33,7 @@
           <button class="tab" data-tab="groups">Fase de Grupos</button>
           <button class="tab" data-tab="final">Fase Final</button>
           <button class="tab" data-tab="r16">Definición 16vos de final</button>
+          <button class="tab" data-tab="notifications">Notificaciones</button>
         </div>
 
         <div class="tab-panel" data-panel="admin">
@@ -61,8 +62,35 @@
         <div class="tab-panel hidden" data-panel="r16">
           <h2>Definición de 16vos de final</h2>
           <p class="muted">Elegí los equipos con dropdown y horario del partido.</p>
+          <div class="row" style="align-items:center; gap:10px;">
+            <button id="saveGlobalR16">Guardar 16vos globales</button>
+            <button id="toggleFinalStageEnabled" type="button">Habilitar carga de 16vos para usuarios</button>
+            <span id="finalStageEnabledStatus" class="muted"></span>
+          </div>
           <div id="globalR16Editor" class="stack muted">Cargando...</div>
-          <button id="saveGlobalR16">Guardar 16vos globales</button>
+          <p id="globalR16Msg" class="notice"></p>
+        </div>
+
+        <div class="tab-panel hidden stack" data-panel="notifications">
+          <h2>Panel de notificaciones</h2>
+          <p class="muted">Creá y enviá notificaciones push custom a los participantes de los torneos seleccionados.</p>
+
+          <label>
+            Título
+            <input id="customNotifTitle" placeholder="Ej: Fase final habilitada" />
+          </label>
+
+          <label>
+            Mensaje
+            <textarea id="customNotifBody" rows="3" placeholder="Escribí el texto que van a ver en la notificación"></textarea>
+          </label>
+
+          <div class="stack" id="customNotifSelector"></div>
+
+          <div class="row" style="align-items:center; gap:10px;">
+            <button id="sendCustomNotif" type="button">Enviar notificación</button>
+          </div>
+          <p id="customNotifMsg" class="notice"></p>
         </div>
       </section>
 

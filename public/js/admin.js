@@ -15,9 +15,17 @@ const globalScheduleMsg = document.querySelector("#globalScheduleMsg");
 
 const globalR16Editor = document.querySelector("#globalR16Editor");
 const saveGlobalR16Btn = document.querySelector("#saveGlobalR16");
+const globalR16Msg = document.querySelector("#globalR16Msg");
+const toggleFinalStageEnabledBtn = document.querySelector("#toggleFinalStageEnabled");
+const finalStageEnabledStatus = document.querySelector("#finalStageEnabledStatus");
 const globalKnockoutEditor = document.querySelector("#globalKnockoutEditor");
 const globalBonusView = document.querySelector("#globalBonusView");
 const globalKnockoutMsg = document.querySelector("#globalKnockoutMsg");
+const customNotifTitleInput = document.querySelector("#customNotifTitle");
+const customNotifBodyInput = document.querySelector("#customNotifBody");
+const customNotifSelector = document.querySelector("#customNotifSelector");
+const sendCustomNotifBtn = document.querySelector("#sendCustomNotif");
+const customNotifMsg = document.querySelector("#customNotifMsg");
 
 const adminKeyInput = document.querySelector("#adminKey");
 const saveAdminKeyBtn = document.querySelector("#saveAdminKey");
@@ -41,6 +49,8 @@ const datetimeModalSave = document.querySelector("#datetimeModalSave");
 const ADMIN_KEY_STORAGE = "prode_admin_key";
 let knockoutState = null;
 const flashTimers = new Map();
+let tournamentsCache = [];
+let customNotifSelectedTournaments = new Set();
 
 const ROUND_LABELS = {
   R16: "16vos de final",
@@ -344,6 +354,66 @@ function renderTournaments(tournaments) {
   });
 }
 
+function renderCustomNotifSelector(tournaments) {
+  tournamentsCache = tournaments;
+  const ids = tournaments.map((t) => t.id);
+
+  if (!customNotifSelectedTournaments.size) {
+    customNotifSelectedTournaments = new Set(ids);
+  } else {
+    customNotifSelectedTournaments = new Set(ids.filter((id) => customNotifSelectedTournaments.has(id)));
+  }
+
+  if (!tournaments.length) {
+    customNotifSelector.innerHTML = '<p class="muted">No hay torneos para notificar.</p>';
+    return;
+  }
+
+  customNotifSelector.innerHTML = `
+    <p class="muted" style="margin:0;">Torneos a notificar</p>
+    <div class="row" style="gap:8px;">
+      <button id="customNotifSelectAll" class="secondary" type="button">Seleccionar todos</button>
+      <button id="customNotifSelectNone" class="secondary" type="button">Quitar todos</button>
+    </div>
+    <div class="stack notif-tournament-list">
+      ${tournaments
+        .map((t) => `
+          <label class="notif-tournament-row">
+            <input type="checkbox" data-custom-notif-tournament="${t.id}" ${customNotifSelectedTournaments.has(t.id) ? "checked" : ""} />
+            <span>${t.name} (${t.participants} participantes)</span>
+          </label>
+        `)
+        .join("")}
+    </div>
+  `;
+
+  const syncSelected = () => {
+    customNotifSelectedTournaments = new Set(
+      [...customNotifSelector.querySelectorAll("input[data-custom-notif-tournament]:checked")].map((el) =>
+        el.dataset.customNotifTournament
+      )
+    );
+  };
+
+  customNotifSelector.querySelectorAll("input[data-custom-notif-tournament]").forEach((input) => {
+    input.addEventListener("change", syncSelected);
+  });
+
+  customNotifSelector.querySelector("#customNotifSelectAll")?.addEventListener("click", () => {
+    customNotifSelector.querySelectorAll("input[data-custom-notif-tournament]").forEach((input) => {
+      input.checked = true;
+    });
+    syncSelected();
+  });
+
+  customNotifSelector.querySelector("#customNotifSelectNone")?.addEventListener("click", () => {
+    customNotifSelector.querySelectorAll("input[data-custom-notif-tournament]").forEach((input) => {
+      input.checked = false;
+    });
+    syncSelected();
+  });
+}
+
 function renderGlobalGroupSchedule(matches) {
   const grouped = byGroup(matches || []);
   globalScheduleWrap.innerHTML = [...grouped.entries()]
@@ -395,7 +465,7 @@ function renderGlobalGroupSchedule(matches) {
 }
 
 function countrySelect(opts) {
-  return `<option value="">Seleccionar</option>${opts.map((x) => `<option value="${x}">${countryLabel(x)}</option>`).join("")}`;
+  return `<option value="">Dejar en blanco</option>${opts.map((x) => `<option value="${x}">${countryLabel(x)}</option>`).join("")}`;
 }
 
 function renderR16Editor(data) {
@@ -427,6 +497,11 @@ function renderR16Editor(data) {
 function renderGlobalKnockout(data) {
   knockoutState = data;
   renderR16Editor(data);
+  const finalStageEnabled = Boolean(data.finalStageEnabled);
+  toggleFinalStageEnabledBtn.textContent = finalStageEnabled
+    ? "Deshabilitar carga de 16vos para usuarios"
+    : "Habilitar carga de 16vos para usuarios";
+  finalStageEnabledStatus.innerHTML = `Estado: <span class="status-chip ${finalStageEnabled ? "is-on" : "is-off"}">${finalStageEnabled ? "Habilitado" : "Deshabilitado"}</span>`;
 
   globalKnockoutEditor.innerHTML = ROUND_ORDER.map((round) => {
     const count = roundCount(round);
@@ -518,6 +593,9 @@ async function loadTournaments() {
     globalScheduleWrap.innerHTML = "<p class=\"muted\">Panel bloqueado hasta validar clave admin.</p>";
     globalR16Editor.innerHTML = "<p class=\"muted\">Panel bloqueado hasta validar clave admin.</p>";
     globalKnockoutEditor.innerHTML = "";
+    customNotifSelector.innerHTML = "<p class=\"muted\">Panel bloqueado hasta validar clave admin.</p>";
+    customNotifSelectedTournaments = new Set();
+    tournamentsCache = [];
     return;
   }
 
@@ -527,7 +605,9 @@ async function loadTournaments() {
   list.innerHTML = "Cargando...";
   const res = await fetch("/api/tournaments", { headers: adminHeaders() });
   const data = await res.json();
-  renderTournaments(data.tournaments || []);
+  const tournaments = data.tournaments || [];
+  renderTournaments(tournaments);
+  renderCustomNotifSelector(tournaments);
 }
 
 saveAdminKeyBtn.addEventListener("click", async () => {
@@ -543,7 +623,7 @@ clearAdminKeyBtn.addEventListener("click", async () => {
 });
 
 saveGlobalR16Btn.addEventListener("click", async () => {
-  globalKnockoutMsg.textContent = "";
+  globalR16Msg.textContent = "";
   const matches = [...globalR16Editor.querySelectorAll(".match-line")].map((row) => {
     const homeInput = row.querySelector("select[data-r16-home]");
     const awayInput = row.querySelector("select[data-r16-away]");
@@ -564,12 +644,80 @@ saveGlobalR16Btn.addEventListener("click", async () => {
 
   const data = await res.json();
   if (!res.ok) {
-    globalKnockoutMsg.textContent = data.error ?? "No se pudo guardar 16vos globales";
+    flashMessage(globalR16Msg, data.error ?? "No se pudo guardar 16vos globales", true);
     return;
   }
 
-  globalKnockoutMsg.textContent = "16vos globales guardados.";
+  flashMessage(globalR16Msg, "16vos globales guardados.");
   await loadGlobalKnockout();
+});
+
+toggleFinalStageEnabledBtn.addEventListener("click", async () => {
+  const current = Boolean(knockoutState?.finalStageEnabled);
+  const next = !current;
+
+  const confirmed = await openModal({
+    title: next ? "Habilitar 16vos para usuarios" : "Deshabilitar 16vos para usuarios",
+    text: next
+      ? "Los usuarios podrán completar y enviar la fase final."
+      : "Los usuarios no podrán enviar la fase final hasta volver a habilitarla.",
+    confirmText: next ? "Habilitar" : "Deshabilitar"
+  });
+  if (!confirmed) return;
+
+  const res = await fetch("/api/admin/knockout/final-stage-enabled", {
+    method: "PATCH",
+    headers: adminHeaders({ "Content-Type": "application/json" }),
+    body: JSON.stringify({ enabled: next })
+  });
+
+  const data = await res.json().catch(() => ({}));
+  if (!res.ok) {
+    flashMessage(globalR16Msg, data.error ?? "No se pudo actualizar el estado de 16vos", true);
+    return;
+  }
+
+  if (next) {
+    const notified = Number(data.notifiedCount ?? 0);
+    flashMessage(globalR16Msg, `16vos habilitados para usuarios. Avisos enviados: ${notified}.`);
+  } else {
+    flashMessage(globalR16Msg, "16vos deshabilitados para usuarios.");
+  }
+  await loadGlobalKnockout();
+});
+
+sendCustomNotifBtn.addEventListener("click", async () => {
+  customNotifMsg.textContent = "";
+
+  const title = customNotifTitleInput.value.trim();
+  const body = customNotifBodyInput.value.trim();
+  const tournamentIds = [...customNotifSelectedTournaments];
+
+  if (!title || !body) {
+    flashMessage(customNotifMsg, "Completá título y mensaje para enviar la notificación.", true);
+    return;
+  }
+
+  const res = await fetch("/api/admin/notifications/custom", {
+    method: "POST",
+    headers: adminHeaders({ "Content-Type": "application/json" }),
+    body: JSON.stringify({
+      title,
+      body,
+      tournamentIds
+    })
+  });
+
+  const data = await res.json().catch(() => ({}));
+  if (!res.ok) {
+    flashMessage(customNotifMsg, data.error ?? "No se pudo enviar la notificación.", true);
+    return;
+  }
+
+  flashMessage(
+    customNotifMsg,
+    `Enviado. Torneos: ${data.selectedTournamentCount ?? tournamentIds.length}. Participantes notificados: ${data.deliveredParticipants ?? 0}. Notificaciones enviadas: ${data.sentNotifications ?? 0}.`
+  );
 });
 
 adminKeyInput.value = getAdminKey();
