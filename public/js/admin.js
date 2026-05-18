@@ -359,33 +359,10 @@ function renderTournaments(tournaments) {
         <div class="row">
           <a href="/admin/${t.id}" class="btn-primary">Abrir panel</a>
           <a href="/t/${t.id}" class="btn-primary" target="_blank" rel="noreferrer">Ver link público</a>
-          <button class="danger" data-action="delete">Eliminar torneo</button>
         </div>
       </div>
     `)
     .join("");
-
-  list.querySelectorAll("button[data-action='delete']").forEach((btn) => {
-    btn.addEventListener("click", async () => {
-      const card = btn.closest("[data-tournament-id]");
-      const tournamentId = card?.dataset.tournamentId;
-      if (!tournamentId) return;
-
-      const confirmed = await openModal({
-        title: "Eliminar torneo",
-        text: "Se eliminará el torneo completo con sus participantes. Esta acción no se puede deshacer.",
-        confirmText: "Eliminar"
-      });
-      if (!confirmed) return;
-
-      const res = await fetch(`/api/tournaments/${tournamentId}`, {
-        method: "DELETE",
-        headers: adminHeaders()
-      });
-      if (!res.ok) return;
-      await loadTournaments();
-    });
-  });
 }
 
 function renderCustomNotifSelector(tournaments) {
