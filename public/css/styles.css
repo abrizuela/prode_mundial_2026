@@ -318,8 +318,38 @@ button:disabled {
   font-weight: 700;
 }
 
+.floating-back-btn {
+  position: fixed;
+  right: 16px;
+  bottom: 16px;
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  border-radius: 999px;
+  padding: 10px 16px;
+  font-weight: 700;
+  color: #fff;
+  background: linear-gradient(130deg, var(--accent), #0a9396);
+  text-decoration: none;
+  box-shadow: 0 10px 20px rgba(0, 109, 119, 0.28);
+  z-index: 9999;
+}
+
+.floating-back-btn:hover {
+  filter: brightness(1.05);
+}
+
+
+
 .link-list a:hover {
   text-decoration: underline;
+}
+
+@media (max-width: 520px) {
+  .floating-back-btn {
+    right: 12px;
+    bottom: 12px;
+  }
 }
 
 @media (min-width: 760px) {
