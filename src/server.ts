@@ -804,6 +804,10 @@ app.get("/api/tournaments/:id", requireAdmin, (req, res) => {
         id: p.id,
         name: p.name,
         token: p.token,
+        predictions: {
+          group: p.predictions.group,
+          knockout: p.predictions.knockout
+        },
         groupLockedAt: p.predictions.groupLockedAt,
         finalLockedAt: p.predictions.finalLockedAt,
         notificationsEnabled: (store.pushState.subscriptionsByToken[p.token] ?? []).length > 0,

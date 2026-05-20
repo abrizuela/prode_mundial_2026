@@ -296,6 +296,50 @@ function getKnockoutOutcomeMark(round, matchId, predicted) {
     : '<span class="outcome-mark outcome-miss" aria-label="No acertado">✕</span>';
 }
 
+function renderGroupResultOptions(match, selectedValue) {
+  return `
+    <option value="">-</option>
+    <option value="L" ${selectedValue === "L" ? "selected" : ""}>${countryLabel(match.home)}</option>
+    <option value="E" ${selectedValue === "E" ? "selected" : ""}>🫱🏼‍🫲🏼 Empate</option>
+    <option value="V" ${selectedValue === "V" ? "selected" : ""}>${countryLabel(match.away)}</option>
+  `;
+}
+
+function renderKnockoutResultOptions(homeTeam, awayTeam, selectedValue) {
+  return `
+    <option value="">-</option>
+    <option value="L" ${selectedValue === "L" ? "selected" : ""}>${countryLabel(homeTeam)}</option>
+    <option value="V" ${selectedValue === "V" ? "selected" : ""}>${countryLabel(awayTeam)}</option>
+  `;
+}
+
+function syncPredictionSelectWidths() {
+  const selects = [
+    ...document.querySelectorAll("#groups .result-row select, #knockout .result-row select")
+  ];
+
+  if (!selects.length) return;
+
+  const canvas = syncPredictionSelectWidths.canvas || document.createElement("canvas");
+  syncPredictionSelectWidths.canvas = canvas;
+  const ctx = canvas.getContext("2d");
+  if (!ctx) return;
+
+  const style = window.getComputedStyle(selects[0]);
+  ctx.font = `${style.fontWeight} ${style.fontSize} ${style.fontFamily}`;
+
+  let maxTextWidth = 0;
+  for (const select of selects) {
+    for (const option of select.options) {
+      maxTextWidth = Math.max(maxTextWidth, ctx.measureText(option.textContent ?? "").width);
+    }
+  }
+
+  const horizontalChrome = 54;
+  const width = Math.ceil(maxTextWidth + horizontalChrome);
+  document.documentElement.style.setProperty("--player-result-select-width", `${width}px`);
+}
+
 function renderGroups(tournament, predictions, options = {}) {
   const collapsed = Boolean(options.collapsed);
   const grouped = byGroup(tournament.groupMatches);
@@ -314,10 +358,7 @@ function renderGroups(tournament, predictions, options = {}) {
                 <div class="result-cell">
                   <div class="result-row">
                     <select data-group-match="${m.id}">
-                      <option value="">-</option>
-                      <option value="L" ${predictions.group[m.id] === "L" ? "selected" : ""}>L</option>
-                      <option value="E" ${predictions.group[m.id] === "E" ? "selected" : ""}>E</option>
-                      <option value="V" ${predictions.group[m.id] === "V" ? "selected" : ""}>V</option>
+                      ${renderGroupResultOptions(m, predictions.group[m.id])}
                     </select>
                     ${getGroupOutcomeMark(m.id, predictions.group[m.id])}
                   </div>
@@ -337,6 +378,8 @@ function renderGroups(tournament, predictions, options = {}) {
       scheduleGroupAutosave();
     });
   });
+
+  syncPredictionSelectWidths();
 }
 
 function renderKnockout(tournament, openRounds) {
@@ -361,9 +404,7 @@ function renderKnockout(tournament, openRounds) {
           <div class="result-cell">
             <div class="result-row">
               <select data-round="${round}" data-match="${matchId}">
-                <option value="">-</option>
-                <option value="L" ${currentKnockout[round][matchId] === "L" ? "selected" : ""}>L</option>
-                <option value="V" ${currentKnockout[round][matchId] === "V" ? "selected" : ""}>V</option>
+                ${renderKnockoutResultOptions(t.home, t.away, currentKnockout[round][matchId])}
               </select>
               ${getKnockoutOutcomeMark(round, matchId, currentKnockout[round][matchId])}
             </div>
@@ -401,6 +442,8 @@ function renderKnockout(tournament, openRounds) {
       renderKnockout(tournament, nextOpenRounds);
     });
   });
+
+  syncPredictionSelectWidths();
 }
 
 function readGroupFormData() {

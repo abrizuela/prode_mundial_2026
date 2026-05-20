@@ -1,4 +1,4 @@
-import { leaderboardTable } from "./common.js";
+import { ROUND_ORDER, countryFlag, countryLabel, leaderboardTable } from "./common.js";
 
 const tournamentId = window.location.pathname.split("/").pop();
 
@@ -30,6 +30,10 @@ const customNotifTitleInput = document.querySelector("#customNotifTitle");
 const customNotifBodyInput = document.querySelector("#customNotifBody");
 const sendCustomNotifBtn = document.querySelector("#sendCustomNotif");
 const customNotifMsg = document.querySelector("#customNotifMsg");
+const whatsappMatchSelect = document.querySelector("#whatsappMatchSelect");
+const whatsappPreview = document.querySelector("#whatsappPreview");
+const copyWhatsappBtn = document.querySelector("#copyWhatsappBtn");
+const whatsappMsg = document.querySelector("#whatsappMsg");
 
 const modal = document.querySelector("#appModal");
 const modalTitle = document.querySelector("#modalTitle");
@@ -40,6 +44,160 @@ const modalOk = document.querySelector("#modalOk");
 const ADMIN_KEY_STORAGE = "prode_admin_key";
 let currentTournamentName = "";
 let currentParticipantId = "";
+let currentTournament = null;
+
+const ROUND_LABELS = {
+  R16: "16vos de final",
+  OCT: "8vos de final",
+  QF: "Cuartos de final",
+  SF: "Semifinales",
+  THIRD: "Tercer puesto",
+  FINAL: "Final"
+};
+
+function formatDate(isoOrNull) {
+  if (!isoOrNull) return "Sin fecha";
+  const d = new Date(isoOrNull);
+  if (Number.isNaN(d.getTime())) return "Sin fecha";
+  const dd = String(d.getDate()).padStart(2, "0");
+  const mm = String(d.getMonth() + 1).padStart(2, "0");
+  const yyyy = d.getFullYear();
+  const hh = String(d.getHours()).padStart(2, "0");
+  const min = String(d.getMinutes()).padStart(2, "0");
+  return `${dd}/${mm}/${yyyy} ${hh}:${min}`;
+}
+
+function getWhatsAppMatches(tournament) {
+  const groupMatches = tournament.groupMatches.map((m) => ({
+    key: `group|${m.id}`,
+    stageLabel: `Grupo ${m.group}`,
+    matchId: m.id,
+    home: m.home,
+    away: m.away,
+    kickoffAt: m.kickoffAt,
+    type: "group"
+  }));
+
+  const knockoutMatches = ROUND_ORDER.flatMap((round) =>
+    (tournament.knockoutMatches?.[round] || []).map((m) => ({
+      key: `knockout|${round}|${m.id}`,
+      stageLabel: ROUND_LABELS[round] || round,
+      round,
+      matchId: m.id,
+      home: m.home,
+      away: m.away,
+      kickoffAt: m.kickoffAt,
+      type: "knockout"
+    }))
+  );
+
+  const all = [...groupMatches, ...knockoutMatches];
+  all.sort((a, b) => {
+    const ta = a.kickoffAt ? new Date(a.kickoffAt).getTime() : Number.POSITIVE_INFINITY;
+    const tb = b.kickoffAt ? new Date(b.kickoffAt).getTime() : Number.POSITIVE_INFINITY;
+    return ta - tb;
+  });
+
+  return all;
+}
+
+function formatNames(names) {
+  if (!names.length) return "nadie";
+  return names.join(", ");
+}
+
+function sideMarker(teamName) {
+  return countryFlag(teamName) || countryLabel(teamName) || teamName;
+}
+
+function buildWhatsAppSummary(tournament, match) {
+  const local = [];
+  const draw = [];
+  const away = [];
+
+  for (const participant of tournament.participants) {
+    if (match.type === "group") {
+      const value = participant.predictions?.group?.[match.matchId];
+      if (value === "L") local.push(participant.name);
+      if (value === "E") draw.push(participant.name);
+      if (value === "V") away.push(participant.name);
+      continue;
+    }
+
+    const value = participant.predictions?.knockout?.[match.round]?.[match.matchId];
+    if (value === "L") local.push(participant.name);
+    if (value === "V") away.push(participant.name);
+  }
+
+  const lines = [
+    `🏆 ${tournament.name}`,
+    `📍 ${match.stageLabel}`,
+    `🗓️ ${formatDate(match.kickoffAt)}`,
+    `⚽ ${countryLabel(match.home)} vs ${countryLabel(match.away)}`,
+    "",
+    `${sideMarker(match.home)} ${formatNames(local)}`
+  ];
+
+  if (match.type === "group") {
+    lines.push(`🤝 ${formatNames(draw)}`);
+  }
+
+  lines.push(`${sideMarker(match.away)} ${formatNames(away)}`);
+
+  return lines.join("\n");
+}
+
+function refreshWhatsAppPreview() {
+  if (!currentTournament || !whatsappMatchSelect.value) {
+    whatsappPreview.value = "";
+    return;
+  }
+
+  const matches = getWhatsAppMatches(currentTournament);
+  const selected = matches.find((m) => m.key === whatsappMatchSelect.value);
+  if (!selected) {
+    whatsappPreview.value = "";
+    return;
+  }
+
+  whatsappPreview.value = buildWhatsAppSummary(currentTournament, selected);
+}
+
+function renderWhatsAppPanel(tournament) {
+  const matches = getWhatsAppMatches(tournament);
+  whatsappMatchSelect.innerHTML = "";
+
+  if (!matches.length) {
+    const option = document.createElement("option");
+    option.value = "";
+    option.textContent = "No hay partidos disponibles";
+    whatsappMatchSelect.append(option);
+    whatsappMatchSelect.disabled = true;
+    copyWhatsappBtn.disabled = true;
+    whatsappPreview.value = "";
+    return;
+  }
+
+  whatsappMatchSelect.disabled = false;
+  copyWhatsappBtn.disabled = false;
+
+  for (const match of matches) {
+    const option = document.createElement("option");
+    option.value = match.key;
+    option.textContent = `${match.stageLabel} · ${countryLabel(match.home)} vs ${countryLabel(match.away)} · ${formatDate(match.kickoffAt)}`;
+    whatsappMatchSelect.append(option);
+  }
+
+  const now = Date.now();
+  const nextUpcoming = matches.find((m) => {
+    if (!m.kickoffAt) return false;
+    const ts = new Date(m.kickoffAt).getTime();
+    return Number.isFinite(ts) && ts >= now;
+  });
+
+  whatsappMatchSelect.value = nextUpcoming?.key || matches[0].key;
+  refreshWhatsAppPreview();
+}
 
 function setNotice(el, text, isError = false) {
   el.textContent = text;
@@ -322,6 +480,10 @@ async function load() {
     links.innerHTML = "";
     leaderboardEl.innerHTML = "";
     customNotifRecipientSelect.innerHTML = '<option value="">Todos los participantes</option>';
+    whatsappMatchSelect.innerHTML = '<option value="">Sin acceso admin</option>';
+    whatsappMatchSelect.disabled = true;
+    copyWhatsappBtn.disabled = true;
+    whatsappPreview.value = "";
     return;
   }
 
@@ -340,10 +502,12 @@ async function load() {
   const tournament = data.tournament;
   title.textContent = tournament.name;
   currentTournamentName = tournament.name;
+  currentTournament = tournament;
 
   renderParticipants(tournament);
   renderLeaderboard(data.leaderboard);
   renderNotificationRecipients(tournament);
+  renderWhatsAppPanel(tournament);
 }
 
 function openRenameTournamentModal() {
@@ -472,6 +636,26 @@ sendCustomNotifBtn.addEventListener("click", async () => {
     customNotifMsg,
     `Enviado. Participantes notificados: ${data.deliveredParticipants ?? 0}. Notificaciones enviadas: ${data.sentNotifications ?? 0}.`
   );
+});
+
+whatsappMatchSelect.addEventListener("change", () => {
+  setNotice(whatsappMsg, "");
+  refreshWhatsAppPreview();
+});
+
+copyWhatsappBtn.addEventListener("click", async () => {
+  const text = whatsappPreview.value.trim();
+  if (!text) {
+    setNotice(whatsappMsg, "No hay texto para copiar.", true);
+    return;
+  }
+
+  try {
+    await navigator.clipboard.writeText(text);
+    setNotice(whatsappMsg, "Texto copiado. Listo para pegar en WhatsApp.");
+  } catch {
+    setNotice(whatsappMsg, "No se pudo copiar al portapapeles.", true);
+  }
 });
 
 adminKeyInput.value = getAdminKey();

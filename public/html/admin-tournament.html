@@ -46,6 +46,23 @@
         <div id="leaderboard"></div>
       </section>
 
+      <section class="card stack" id="whatsappPanel">
+        <h2>Resumen para WhatsApp</h2>
+        <p class="muted">Elegí un partido y generá el texto con quién puso local, empate o visitante.</p>
+        <label>
+          Partido
+          <select id="whatsappMatchSelect"></select>
+        </label>
+        <label>
+          Mensaje
+          <textarea id="whatsappPreview" class="whatsapp-preview" rows="8" readonly></textarea>
+        </label>
+        <div class="row">
+          <button id="copyWhatsappBtn" type="button">Copiar texto</button>
+        </div>
+        <p id="whatsappMsg" class="notice"></p>
+      </section>
+
       <section id="notificationsPanel" class="card stack">
         <h2>Notificaciones</h2>
         <p class="muted">Enviá una notificación push a los participantes de este torneo.</p>
