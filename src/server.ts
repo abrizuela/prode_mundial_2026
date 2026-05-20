@@ -5,7 +5,7 @@ import webpush from "web-push";
 import { buildInitialGroupMatches, buildInitialKnockoutMatches, listCompetingTeams } from "./fixtures.ts";
 import { buildLeaderboard, computeRoundTeams, deriveBonusFinal } from "./scoring.ts";
 import { findTournamentByParticipantToken, readStore, writeStore } from "./store.ts";
-import { ROUND_ORDER } from "./types.ts";
+import { isGroupResult, isKnockoutResult, ROUND_ORDER } from "./types.ts";
 import type { BonusPrediction, GroupResult, KnockoutResult, RoundKey, Store, Tournament } from "./types.ts";
 
 const app = express();
@@ -239,7 +239,7 @@ app.patch("/api/admin/group-schedule", requireAdmin, (req, res) => {
 
   const nextResults: Record<string, GroupResult> = {};
   for (const [matchId, value] of Object.entries(resultInput)) {
-    if (value === "L" || value === "E" || value === "V") {
+    if (isGroupResult(value)) {
       nextResults[matchId] = value;
     }
   }
@@ -452,7 +452,7 @@ app.patch("/api/admin/knockout/results", requireAdmin, (req, res) => {
   const resultsInput = req.body?.results ?? {};
   const next: Record<string, KnockoutResult> = {};
   for (const [matchId, value] of Object.entries(resultsInput)) {
-    if (value === "L" || value === "V") {
+    if (isKnockoutResult(value)) {
       next[matchId] = value;
     }
   }
@@ -861,7 +861,7 @@ app.patch("/api/tournaments/:id/actual/group", requireAdmin, (req, res) => {
   const next: Record<string, GroupResult> = {};
 
   for (const [matchId, value] of Object.entries(input)) {
-    if (value === "L" || value === "E" || value === "V") {
+    if (isGroupResult(value)) {
       next[matchId] = value;
     }
   }
@@ -891,7 +891,7 @@ app.patch("/api/tournaments/:id/actual/knockout", requireAdmin, (req, res) => {
   const resultsInput = req.body?.results ?? {};
   const next: Record<string, KnockoutResult> = {};
   for (const [matchId, value] of Object.entries(resultsInput)) {
-    if (value === "L" || value === "V") {
+    if (isKnockoutResult(value)) {
       next[matchId] = value;
     }
   }
@@ -1050,7 +1050,7 @@ app.post("/api/p/:token/submit-group", (req, res) => {
 
   const group: Record<string, GroupResult> = {};
   for (const [matchId, value] of Object.entries(groupInput)) {
-    if (value === "L" || value === "E" || value === "V") {
+    if (isGroupResult(value)) {
       group[matchId] = value;
     }
   }
@@ -1111,7 +1111,7 @@ app.post("/api/p/:token/submit-final", (req, res) => {
   for (const round of ROUND_ORDER) {
     const roundInput = knockoutInput[round] ?? {};
     for (const [matchId, value] of Object.entries(roundInput)) {
-      if (value === "L" || value === "V") {
+      if (isKnockoutResult(value)) {
         knockout[round][matchId] = value;
       }
     }

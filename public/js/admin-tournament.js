@@ -1,4 +1,4 @@
-import { ROUND_ORDER, countryFlag, countryLabel, leaderboardTable } from "./common.js";
+import { GROUP_RESULT, KNOCKOUT_RESULT, ROUND_ORDER, countryFlag, countryLabel, leaderboardTable } from "./common.js";
 
 const tournamentId = window.location.pathname.split("/").pop();
 
@@ -118,15 +118,15 @@ function buildWhatsAppSummary(tournament, match) {
   for (const participant of tournament.participants) {
     if (match.type === "group") {
       const value = participant.predictions?.group?.[match.matchId];
-      if (value === "L") local.push(participant.name);
-      if (value === "E") draw.push(participant.name);
-      if (value === "V") away.push(participant.name);
+      if (value === GROUP_RESULT.HOME) local.push(participant.name);
+      if (value === GROUP_RESULT.DRAW) draw.push(participant.name);
+      if (value === GROUP_RESULT.AWAY) away.push(participant.name);
       continue;
     }
 
     const value = participant.predictions?.knockout?.[match.round]?.[match.matchId];
-    if (value === "L") local.push(participant.name);
-    if (value === "V") away.push(participant.name);
+    if (value === KNOCKOUT_RESULT.HOME) local.push(participant.name);
+    if (value === KNOCKOUT_RESULT.AWAY) away.push(participant.name);
   }
 
   const lines = [

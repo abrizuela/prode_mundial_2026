@@ -1,5 +1,24 @@
-export type GroupResult = "L" | "E" | "V";
-export type KnockoutResult = "L" | "V";
+export const GroupResultCode = {
+  HOME: "L",
+  DRAW: "E",
+  AWAY: "V"
+} as const;
+
+export const KnockoutResultCode = {
+  HOME: GroupResultCode.HOME,
+  AWAY: GroupResultCode.AWAY
+} as const;
+
+export type GroupResult = (typeof GroupResultCode)[keyof typeof GroupResultCode];
+export type KnockoutResult = (typeof KnockoutResultCode)[keyof typeof KnockoutResultCode];
+
+export function isGroupResult(value: unknown): value is GroupResult {
+  return value === GroupResultCode.HOME || value === GroupResultCode.DRAW || value === GroupResultCode.AWAY;
+}
+
+export function isKnockoutResult(value: unknown): value is KnockoutResult {
+  return value === KnockoutResultCode.HOME || value === KnockoutResultCode.AWAY;
+}
 
 export type RoundKey = "R16" | "OCT" | "QF" | "SF" | "THIRD" | "FINAL";
 

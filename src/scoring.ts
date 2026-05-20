@@ -1,20 +1,20 @@
-import { ROUND_ORDER, ROUND_POINTS } from "./types.ts";
-import type { RoundKey, Tournament } from "./types.ts";
+import { KnockoutResultCode, ROUND_ORDER, ROUND_POINTS } from "./types.ts";
+import type { KnockoutResult, RoundKey, Tournament } from "./types.ts";
 
 type RoundTeams = Record<RoundKey, { home: string; away: string }[]>;
 
-function pickWinner(home: string, away: string, result: "L" | "V" | undefined) {
+function pickWinner(home: string, away: string, result: KnockoutResult | undefined) {
   if (!result) {
     return null;
   }
-  return result === "L" ? home : away;
+  return result === KnockoutResultCode.HOME ? home : away;
 }
 
-function pickLoser(home: string, away: string, result: "L" | "V" | undefined) {
+function pickLoser(home: string, away: string, result: KnockoutResult | undefined) {
   if (!result) {
     return null;
   }
-  return result === "L" ? away : home;
+  return result === KnockoutResultCode.HOME ? away : home;
 }
 
 const KNOCKOUT_MATCH_START: Partial<Record<RoundKey, number>> = {

@@ -1,4 +1,4 @@
-import { ROUND_ORDER, countryLabel, roundCount } from "./common.js";
+import { GROUP_RESULT, KNOCKOUT_RESULT, ROUND_ORDER, countryLabel, roundCount } from "./common.js";
 
 const openCreateBtn = document.querySelector("#openCreateBtn");
 const createMsg = document.querySelector("#createMsg");
@@ -444,9 +444,9 @@ function renderGlobalGroupSchedule(matches) {
                 <div class="result-cell admin-result-cell">
                   <select class="admin-result-select" data-global-group-result="${m.id}">
                     <option value="" ${!m.result ? "selected" : ""}>-</option>
-                    <option value="L" ${m.result === "L" ? "selected" : ""}>${countryLabel(m.home)}</option>
-                    <option value="E" ${m.result === "E" ? "selected" : ""}>🤝 Empate</option>
-                    <option value="V" ${m.result === "V" ? "selected" : ""}>${countryLabel(m.away)}</option>
+                    <option value="${GROUP_RESULT.HOME}" ${m.result === GROUP_RESULT.HOME ? "selected" : ""}>${countryLabel(m.home)}</option>
+                    <option value="${GROUP_RESULT.DRAW}" ${m.result === GROUP_RESULT.DRAW ? "selected" : ""}>🤝 Empate</option>
+                    <option value="${GROUP_RESULT.AWAY}" ${m.result === GROUP_RESULT.AWAY ? "selected" : ""}>${countryLabel(m.away)}</option>
                   </select>
                   <span class="save-flash"></span>
                 </div>
@@ -549,8 +549,8 @@ function renderGlobalKnockout(data) {
           <div class="result-cell admin-result-cell">
             <select class="admin-result-select" data-round="${round}" data-match="${matchId}">
               <option value="" ${!result ? "selected" : ""}>-</option>
-              <option value="L" ${result === "L" ? "selected" : ""}>${countryLabel(teamLine.home)}</option>
-              <option value="V" ${result === "V" ? "selected" : ""}>${countryLabel(teamLine.away)}</option>
+              <option value="${KNOCKOUT_RESULT.HOME}" ${result === KNOCKOUT_RESULT.HOME ? "selected" : ""}>${countryLabel(teamLine.home)}</option>
+              <option value="${KNOCKOUT_RESULT.AWAY}" ${result === KNOCKOUT_RESULT.AWAY ? "selected" : ""}>${countryLabel(teamLine.away)}</option>
             </select>
             <span class="save-flash"></span>
           </div>

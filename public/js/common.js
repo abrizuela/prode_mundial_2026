@@ -1,5 +1,16 @@
 export const ROUND_ORDER = ["R16", "OCT", "QF", "SF", "THIRD", "FINAL"];
 
+export const GROUP_RESULT = Object.freeze({
+  HOME: "L",
+  DRAW: "E",
+  AWAY: "V"
+});
+
+export const KNOCKOUT_RESULT = Object.freeze({
+  HOME: GROUP_RESULT.HOME,
+  AWAY: GROUP_RESULT.AWAY
+});
+
 const COUNTRY_CODE_BY_NAME = {
   mexico: "MX",
   "corea del sur": "KR",
@@ -110,12 +121,12 @@ export function countryLabel(countryName) {
 
 function pickWinner(home, away, result) {
   if (!result) return null;
-  return result === "L" ? home : away;
+  return result === KNOCKOUT_RESULT.HOME ? home : away;
 }
 
 function pickLoser(home, away, result) {
   if (!result) return null;
-  return result === "L" ? away : home;
+  return result === KNOCKOUT_RESULT.HOME ? away : home;
 }
 
 const OCT_FROM_R16 = [

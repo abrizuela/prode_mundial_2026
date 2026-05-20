@@ -1,4 +1,4 @@
-import { ROUND_ORDER, byGroup, computeRoundTeams, countryLabel, leaderboardTable, roundCount } from "./common.js";
+import { GROUP_RESULT, KNOCKOUT_RESULT, ROUND_ORDER, byGroup, computeRoundTeams, countryLabel, leaderboardTable, roundCount } from "./common.js";
 
 function formatDate(isoOrNull) {
   if (!isoOrNull) return "";
@@ -299,17 +299,17 @@ function getKnockoutOutcomeMark(round, matchId, predicted) {
 function renderGroupResultOptions(match, selectedValue) {
   return `
     <option value="">-</option>
-    <option value="L" ${selectedValue === "L" ? "selected" : ""}>${countryLabel(match.home)}</option>
-    <option value="E" ${selectedValue === "E" ? "selected" : ""}>🫱🏼‍🫲🏼 Empate</option>
-    <option value="V" ${selectedValue === "V" ? "selected" : ""}>${countryLabel(match.away)}</option>
+    <option value="${GROUP_RESULT.HOME}" ${selectedValue === GROUP_RESULT.HOME ? "selected" : ""}>${countryLabel(match.home)}</option>
+    <option value="${GROUP_RESULT.DRAW}" ${selectedValue === GROUP_RESULT.DRAW ? "selected" : ""}>🫱🏼‍🫲🏼 Empate</option>
+    <option value="${GROUP_RESULT.AWAY}" ${selectedValue === GROUP_RESULT.AWAY ? "selected" : ""}>${countryLabel(match.away)}</option>
   `;
 }
 
 function renderKnockoutResultOptions(homeTeam, awayTeam, selectedValue) {
   return `
     <option value="">-</option>
-    <option value="L" ${selectedValue === "L" ? "selected" : ""}>${countryLabel(homeTeam)}</option>
-    <option value="V" ${selectedValue === "V" ? "selected" : ""}>${countryLabel(awayTeam)}</option>
+    <option value="${KNOCKOUT_RESULT.HOME}" ${selectedValue === KNOCKOUT_RESULT.HOME ? "selected" : ""}>${countryLabel(homeTeam)}</option>
+    <option value="${KNOCKOUT_RESULT.AWAY}" ${selectedValue === KNOCKOUT_RESULT.AWAY ? "selected" : ""}>${countryLabel(awayTeam)}</option>
   `;
 }
 
