@@ -471,13 +471,21 @@ app.post("/api/admin/notifications/custom", requireAdmin, (req, res) => {
     const body = typeof req.body?.body === "string" ? req.body.body.trim() : "";
     const rawUrl = typeof req.body?.url === "string" ? req.body.url.trim() : "";
     const hasTournamentFilter = Array.isArray(req.body?.tournamentIds);
+    const hasParticipantFilter = Array.isArray(req.body?.participantIds);
     const tournamentIds = hasTournamentFilter
       ? req.body.tournamentIds
           .filter((v: unknown) => typeof v === "string")
           .map((v: string) => v.trim())
           .filter((v: string) => v.length > 0)
       : [];
+    const participantIds = hasParticipantFilter
+      ? req.body.participantIds
+          .filter((v: unknown) => typeof v === "string")
+          .map((v: string) => v.trim())
+          .filter((v: string) => v.length > 0)
+      : [];
     const selectedTournamentIds = new Set(tournamentIds);
+    const selectedParticipantIds = new Set(participantIds);
 
     if (!title || !body) {
       res.status(400).json({ error: "Título y mensaje son obligatorios" });
@@ -494,6 +502,8 @@ app.post("/api/admin/notifications/custom", requireAdmin, (req, res) => {
 
     for (const tournament of selectedTournaments) {
       for (const participant of tournament.participants) {
+        if (hasParticipantFilter && !selectedParticipantIds.has(participant.id)) continue;
+
         const token = participant.token;
         const subscriptions = store.pushState.subscriptionsByToken[token] ?? [];
         if (!subscriptions.length) continue;

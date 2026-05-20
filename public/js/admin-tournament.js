@@ -24,6 +24,12 @@ const adminKeyInput = document.querySelector("#adminKey");
 const saveAdminKeyBtn = document.querySelector("#saveAdminKey");
 const clearAdminKeyBtn = document.querySelector("#clearAdminKey");
 const adminAuthMsg = document.querySelector("#adminAuthMsg");
+const notificationsPanel = document.querySelector("#notificationsPanel");
+const customNotifRecipientSelect = document.querySelector("#customNotifRecipient");
+const customNotifTitleInput = document.querySelector("#customNotifTitle");
+const customNotifBodyInput = document.querySelector("#customNotifBody");
+const sendCustomNotifBtn = document.querySelector("#sendCustomNotif");
+const customNotifMsg = document.querySelector("#customNotifMsg");
 
 const modal = document.querySelector("#appModal");
 const modalTitle = document.querySelector("#modalTitle");
@@ -34,6 +40,11 @@ const modalOk = document.querySelector("#modalOk");
 const ADMIN_KEY_STORAGE = "prode_admin_key";
 let currentTournamentName = "";
 let currentParticipantId = "";
+
+function setNotice(el, text, isError = false) {
+  el.textContent = text;
+  el.style.color = isError ? "#a62d2d" : "";
+}
 
 function openModal({ title, text, confirmText = "Aceptar", cancelText = "Cancelar" }) {
   modalTitle.textContent = title;
@@ -102,6 +113,12 @@ function copyToClipboard(url, btn) {
   });
 }
 
+function openParticipantNotification(participantId) {
+  customNotifRecipientSelect.value = participantId;
+  notificationsPanel?.scrollIntoView({ behavior: "smooth", block: "start" });
+  customNotifTitleInput.focus();
+}
+
 function renderParticipants(tournament) {
   if (!tournament.participants.length) {
     links.innerHTML = `
@@ -140,6 +157,7 @@ function renderParticipants(tournament) {
           </div>
         </div>
         <div class="row">
+          <button class='secondary' data-action='notify-participant'>Notificar</button>
           <button class='secondary' data-action='unlock-group' ${canUnlockGroup ? "" : "disabled"}>Habilitar edición Fase de Grupos</button>
           <button class='secondary' data-action='unlock-final' ${canUnlockFinal ? "" : "disabled"}>Habilitar edición Fase Final</button>
           <button class="danger" data-action="delete-participant">Eliminar</button>
@@ -171,6 +189,16 @@ function renderParticipants(tournament) {
       renameParticipantInput.value = participantName;
       renameParticipantModal.classList.remove("hidden");
       renameParticipantInput.focus();
+    });
+  });
+
+  links.querySelectorAll("button[data-action='notify-participant']").forEach((btn) => {
+    btn.addEventListener("click", () => {
+      const card = btn.closest("[data-participant-id]");
+      const participantId = card?.dataset.participantId ?? "";
+      if (!participantId) return;
+
+      openParticipantNotification(participantId);
     });
   });
 
@@ -272,12 +300,24 @@ function renderLeaderboard(leaderboard) {
   leaderboardEl.innerHTML = leaderboardTable(leaderboard);
 }
 
+function renderNotificationRecipients(tournament) {
+  customNotifRecipientSelect.innerHTML = '<option value="">Todos los participantes</option>';
+
+  for (const participant of tournament.participants) {
+    const option = document.createElement("option");
+    option.value = participant.id;
+    option.textContent = participant.name;
+    customNotifRecipientSelect.append(option);
+  }
+}
+
 async function load() {
   const ok = await validateAdminKey();
   if (!ok) {
     title.textContent = "Panel admin bloqueado";
     links.innerHTML = "";
     leaderboardEl.innerHTML = "";
+    customNotifRecipientSelect.innerHTML = '<option value="">Todos los participantes</option>';
     return;
   }
 
@@ -299,6 +339,7 @@ async function load() {
 
   renderParticipants(tournament);
   renderLeaderboard(data.leaderboard);
+  renderNotificationRecipients(tournament);
 }
 
 function openRenameTournamentModal() {
@@ -391,6 +432,42 @@ clearAdminKeyBtn.addEventListener("click", async () => {
   localStorage.removeItem(ADMIN_KEY_STORAGE);
   adminKeyInput.value = "";
   await load();
+});
+
+sendCustomNotifBtn.addEventListener("click", async () => {
+  const participantId = customNotifRecipientSelect.value;
+  const title = customNotifTitleInput.value.trim();
+  const body = customNotifBodyInput.value.trim();
+
+  if (!title || !body) {
+    setNotice(customNotifMsg, "Completá título y mensaje para enviar la notificación.", true);
+    return;
+  }
+
+  setNotice(customNotifMsg, "");
+
+  const res = await fetch("/api/admin/notifications/custom", {
+    method: "POST",
+    headers: adminHeaders({ "Content-Type": "application/json" }),
+    body: JSON.stringify({
+      title,
+      body,
+      tournamentIds: [tournamentId],
+      participantIds: participantId ? [participantId] : undefined
+    })
+  });
+
+  const data = await res.json().catch(() => ({}));
+  if (!res.ok) {
+    setNotice(customNotifMsg, data.error ?? "No se pudo enviar la notificación.", true);
+    return;
+  }
+
+  customNotifBodyInput.value = "";
+  setNotice(
+    customNotifMsg,
+    `Enviado. Participantes notificados: ${data.deliveredParticipants ?? 0}. Notificaciones enviadas: ${data.sentNotifications ?? 0}.`
+  );
 });
 
 adminKeyInput.value = getAdminKey();

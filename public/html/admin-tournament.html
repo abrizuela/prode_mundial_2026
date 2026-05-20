@@ -46,6 +46,29 @@
         <div id="leaderboard"></div>
       </section>
 
+      <section id="notificationsPanel" class="card stack">
+        <h2>Notificaciones</h2>
+        <p class="muted">Enviá una notificación push a los participantes de este torneo.</p>
+        <label>
+          Destinatario
+          <select id="customNotifRecipient">
+            <option value="">Todos los participantes</option>
+          </select>
+        </label>
+        <label>
+          Título
+          <input id="customNotifTitle" placeholder="Ej: Fase final habilitada" />
+        </label>
+        <label>
+          Mensaje
+          <textarea id="customNotifBody" rows="3" placeholder="Escribí el texto que van a ver en la notificación"></textarea>
+        </label>
+        <div class="row">
+          <button id="sendCustomNotif" type="button">Enviar notificación</button>
+        </div>
+        <p id="customNotifMsg" class="notice"></p>
+      </section>
+
       <section class="card stack">
         <h2>Zona peligrosa</h2>
         <p class="muted">Eliminá el torneo completo y todos sus participantes.</p>
