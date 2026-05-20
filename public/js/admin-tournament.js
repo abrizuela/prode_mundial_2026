@@ -142,12 +142,16 @@ function renderParticipants(tournament) {
       const canUnlockGroup = Boolean(p.groupLockedAt);
       const canUnlockFinal = Boolean(p.finalLockedAt);
       const url = `${window.location.origin}${p.playerUrl || p.groupUrl}`;
+      const notifStatus = p.notificationsEnabled
+        ? "<span class='status-chip is-on'>Notificaciones activas</span>"
+        : "<span class='status-chip is-off'>Sin notificaciones</span>";
       return `
       <div class="group-box stack" data-participant-id="${p.id}">
         <div class="stack">
           <div class="row" style="align-items:center; gap:8px;">
             <strong>${p.name}</strong>
             <button class="icon-btn" data-action="open-rename-participant" type="button" aria-label="Cambiar nombre del participante">✎</button>
+            ${notifStatus}
             ${p.groupLockedAt ? "<span class='tag'>Grupos enviado</span>" : ""}
             ${p.finalLockedAt ? "<span class='tag'>Final enviado</span>" : ""}
           </div>

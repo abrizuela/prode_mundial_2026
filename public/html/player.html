@@ -15,7 +15,7 @@
       <section class="card hero">
         <h1 id="title" class="brand-title"><img src="/assets/2026_FIFA_World_Cup_badge.png" alt="Logo PRODE Mundial 2026" /> <span>PRODE Mundial 2026</span></h1>
         <p id="subtitle">Cargando...</p>
-        <p id="heroHint" class="muted">Esta carga se bloquea al enviar y no se puede modificar.</p>
+        <p id="heroHint" class="muted">Los cambios se guardan automáticamente.</p>
       </section>
 
       <section class="card stack" id="leaderboardSection" style="display:none">
@@ -42,7 +42,6 @@
         <h2>Fase de grupos</h2>
         <div id="groups" class="stack"></div>
         <div class="stack submit-inline">
-          <button id="submitGroupBtn">Enviar fase de grupos</button>
           <p id="submitGroupMsg" class="notice"></p>
         </div>
       </section>
@@ -51,7 +50,6 @@
         <h2>Fase final</h2>
         <div id="knockout"></div>
         <div class="stack submit-inline">
-          <button id="submitFinalBtn">Enviar fase final</button>
           <p id="submitFinalMsg" class="notice"></p>
         </div>
       </section>
@@ -64,6 +62,10 @@
           <button id="disableKickoffNotif" class="secondary">Desactivar</button>
         </div>
         <p id="notifStatus" class="muted"></p>
+      </section>
+
+      <section class="card stack" id="saveNotice">
+        <p class="notice" id="saveMessage">Resultado guardado</p>
       </section>
 
       <div id="appModal" class="modal hidden" role="dialog" aria-modal="true" aria-labelledby="modalTitle">

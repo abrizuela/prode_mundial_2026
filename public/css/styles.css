@@ -374,16 +374,34 @@ button:disabled {
   display: flex;
   flex-direction: column;
   align-items: flex-end;
+  position: relative;
+  min-width: 96px;
+  padding-bottom: 16px;
   gap: 2px;
 }
 
 .save-flash {
+  position: absolute;
+  right: 0;
+  bottom: 0;
   font-size: 0.72rem;
   color: var(--ok);
   font-weight: 600;
+  line-height: 1.1;
+  text-align: right;
   white-space: nowrap;
-  min-height: 1em;
   transition: opacity 0.2s ease;
+  pointer-events: none;
+}
+
+.save-message {
+  font-size: 0.9rem;
+  color: var(--ok);
+  margin-left: 8px;
+}
+
+.save-message.error {
+  color: var(--warm);
 }
 
 .result-row {

@@ -165,6 +165,16 @@ function isR16Defined(matches: Array<{ home: string; away: string }>) {
   });
 }
 
+function hasEditWindowClosed(kickoffAtList: Array<string | null | undefined>) {
+  const kickoffTimes = kickoffAtList
+    .map((kickoffAt) => (kickoffAt ? new Date(kickoffAt).getTime() : Number.NaN))
+    .filter((value) => Number.isFinite(value));
+
+  if (!kickoffTimes.length) return false;
+  const firstKickoff = Math.min(...kickoffTimes);
+  return Date.now() >= (firstKickoff - 60 * 60 * 1000);
+}
+
 app.get("/", (_req, res) => {
   res.sendFile(path.join(process.cwd(), "public", "html", "admin.html"));
 });
@@ -796,6 +806,7 @@ app.get("/api/tournaments/:id", requireAdmin, (req, res) => {
         token: p.token,
         groupLockedAt: p.predictions.groupLockedAt,
         finalLockedAt: p.predictions.finalLockedAt,
+        notificationsEnabled: (store.pushState.subscriptionsByToken[p.token] ?? []).length > 0,
         ...participantLinks(p.token)
       })),
       groupMatches: tournament.groupMatches,
@@ -1018,9 +1029,15 @@ app.post("/api/p/:token/submit-group", (req, res) => {
   }
 
   const participant = tournament.participants[participantIndex];
+  const projectedTournament = withGlobalTournamentData(store, tournament);
 
   if (participant.predictions.groupLockedAt) {
-    res.status(409).json({ error: "La fase de grupos ya fue enviada y está bloqueada" });
+    res.status(409).json({ error: "La fase de grupos está bloqueada por admin" });
+    return;
+  }
+
+  if (hasEditWindowClosed(projectedTournament.groupMatches.map((m) => m.kickoffAt))) {
+    res.status(409).json({ error: "La edición de fase de grupos cerró una hora antes del primer partido" });
     return;
   }
 
@@ -1041,10 +1058,9 @@ app.post("/api/p/:token/submit-group", (req, res) => {
     third: typeof bonusInput.third === "string" ? bonusInput.third.trim() : "",
     fourth: typeof bonusInput.fourth === "string" ? bonusInput.fourth.trim() : ""
   };
-  participant.predictions.groupLockedAt = new Date().toISOString();
 
   writeStore(store);
-  res.json({ ok: true, lockedAt: participant.predictions.groupLockedAt });
+  res.json({ ok: true, savedAt: new Date().toISOString() });
 });
 
 app.post("/api/p/:token/submit-final", (req, res) => {
@@ -1068,11 +1084,7 @@ app.post("/api/p/:token/submit-final", (req, res) => {
   }
 
   const participant = tournament.participants[participantIndex];
-
-  if (!participant.predictions.groupLockedAt) {
-    res.status(409).json({ error: "Primero debés completar la fase de grupos" });
-    return;
-  }
+  const projectedTournament = withGlobalTournamentData(store, tournament);
 
   if (!store.finalStageEnabled) {
     res.status(409).json({ error: "La fase final todavía no está habilitada por el admin" });
@@ -1080,7 +1092,13 @@ app.post("/api/p/:token/submit-final", (req, res) => {
   }
 
   if (participant.predictions.finalLockedAt) {
-    res.status(409).json({ error: "La fase final ya fue enviada y está bloqueada" });
+    res.status(409).json({ error: "La fase final está bloqueada por admin" });
+    return;
+  }
+
+  const allKnockoutKickoff = ROUND_ORDER.flatMap((round) => projectedTournament.knockoutMatches[round].map((m) => m.kickoffAt));
+  if (hasEditWindowClosed(allKnockoutKickoff)) {
+    res.status(409).json({ error: "La edición de fase final cerró una hora antes del primer partido" });
     return;
   }
 
@@ -1096,10 +1114,9 @@ app.post("/api/p/:token/submit-final", (req, res) => {
   }
 
   participant.predictions.knockout = knockout;
-  participant.predictions.finalLockedAt = new Date().toISOString();
 
   writeStore(store);
-  res.json({ ok: true, lockedAt: participant.predictions.finalLockedAt });
+  res.json({ ok: true, savedAt: new Date().toISOString() });
 });
 
 app.post("/api/p/:token/submit", (req, res) => {

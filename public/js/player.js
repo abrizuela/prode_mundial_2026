@@ -23,9 +23,7 @@ const groupsWrap = document.querySelector("#groups");
 const knockoutWrap = document.querySelector("#knockout");
 const leaderboardEl = document.querySelector("#leaderboard");
 
-const submitGroupBtn = document.querySelector("#submitGroupBtn");
 const submitGroupMsg = document.querySelector("#submitGroupMsg");
-const submitFinalBtn = document.querySelector("#submitFinalBtn");
 const submitFinalMsg = document.querySelector("#submitFinalMsg");
 
 const lockNotice = document.querySelector("#lockNotice");
@@ -50,6 +48,7 @@ const modalCancel = document.querySelector("#modalCancel");
 const modalOk = document.querySelector("#modalOk");
 
 let state = null;
+const flashTimers = new WeakMap();
 const NOTIF_ENABLED_KEY = `prode_push_enabled_${token}`;
 const NOTIF_MODAL_SEEN_KEY = `prode_push_modal_seen_${token}`;
 let currentKnockout = {
@@ -60,6 +59,10 @@ let currentKnockout = {
   THIRD: {},
   FINAL: {}
 };
+let groupSaveTimer = null;
+let finalSaveTimer = null;
+const touchedGroupMatches = new Set();
+const touchedFinalMatches = new Set();
 
 const ROUND_LABELS = {
   R16: "16vos de final",
@@ -69,6 +72,82 @@ const ROUND_LABELS = {
   THIRD: "Tercer puesto",
   FINAL: "Final"
 };
+
+function getEditDeadline(matches) {
+  const kickoffTimes = matches
+    .map((m) => (m?.kickoffAt ? new Date(m.kickoffAt).getTime() : Number.NaN))
+    .filter((v) => Number.isFinite(v));
+
+  if (!kickoffTimes.length) return null;
+  const firstKickoff = Math.min(...kickoffTimes);
+  return new Date(firstKickoff - 60 * 60 * 1000);
+}
+
+function isPast(dateOrNull) {
+  if (!dateOrNull) return false;
+  return Date.now() >= dateOrNull.getTime();
+}
+
+function canEditGroup(participant, tournament) {
+  if (participant.predictions.groupLockedAt) return false;
+  const deadline = getEditDeadline(tournament.groupMatches || []);
+  return !isPast(deadline);
+}
+
+function canEditFinal(participant, tournament) {
+  if (!tournament.finalStageEnabled) return false;
+  if (participant.predictions.finalLockedAt) return false;
+
+  const allKnockoutMatches = ROUND_ORDER.flatMap((round) => tournament.knockoutMatches?.[round] || []);
+  const deadline = getEditDeadline(allKnockoutMatches);
+  return !isPast(deadline);
+}
+
+function showAutosaveMessage(el, text, isError = false) {
+  el.textContent = text;
+  el.style.color = isError ? "#a62d2d" : "";
+}
+
+function flashMessage(target, text, isError = false) {
+  if (!target) return;
+
+  const prev = flashTimers.get(target);
+  if (prev) clearTimeout(prev);
+
+  target.style.opacity = "1";
+  target.style.color = isError ? "#b02a37" : "";
+  target.textContent = text;
+
+  const timer = window.setTimeout(() => {
+    target.style.opacity = "0";
+    window.setTimeout(() => {
+      target.textContent = "";
+      target.style.color = "";
+      target.style.opacity = "1";
+    }, 200);
+  }, 2200);
+
+  flashTimers.set(target, timer);
+}
+
+function flashTouchedGroupMatches(text, isError = false) {
+  for (const matchId of touchedGroupMatches) {
+    const flash = groupsWrap.querySelector(`[data-group-save-flash="${matchId}"]`);
+    flashMessage(flash, text, isError);
+  }
+  touchedGroupMatches.clear();
+}
+
+function flashTouchedFinalMatches(text, isError = false) {
+  for (const key of touchedFinalMatches) {
+    const [round, matchId] = key.split("|");
+    const flash = knockoutWrap.querySelector(
+      `[data-final-round="${round}"][data-final-save-flash="${matchId}"]`
+    );
+    flashMessage(flash, text, isError);
+  }
+  touchedFinalMatches.clear();
+}
 
 function openModal({ title, text, confirmText = "Aceptar", cancelText = "Cancelar", showCancel = true }) {
   modalTitle.textContent = title;
@@ -242,6 +321,7 @@ function renderGroups(tournament, predictions, options = {}) {
                     </select>
                     ${getGroupOutcomeMark(m.id, predictions.group[m.id])}
                   </div>
+                  <span class="save-flash" data-group-save-flash="${m.id}"></span>
                 </div>
               </div>
             `)
@@ -250,6 +330,13 @@ function renderGroups(tournament, predictions, options = {}) {
       </details>
     `)
     .join("");
+
+  groupsWrap.querySelectorAll("select[data-group-match]").forEach((s) => {
+    s.addEventListener("change", () => {
+      touchedGroupMatches.add(s.dataset.groupMatch);
+      scheduleGroupAutosave();
+    });
+  });
 }
 
 function renderKnockout(tournament, openRounds) {
@@ -280,6 +367,7 @@ function renderKnockout(tournament, openRounds) {
               </select>
               ${getKnockoutOutcomeMark(round, matchId, currentKnockout[round][matchId])}
             </div>
+            <span class="save-flash" data-final-round="${round}" data-final-save-flash="${matchId}"></span>
           </div>
         </div>
       `;
@@ -307,7 +395,9 @@ function renderKnockout(tournament, openRounds) {
       if (!currentKnockout[round]) currentKnockout[round] = {};
       if (s.value) currentKnockout[round][match] = s.value;
       else delete currentKnockout[round][match];
+      touchedFinalMatches.add(`${round}|${match}`);
       nextOpenRounds.add(round);
+      scheduleFinalAutosave();
       renderKnockout(tournament, nextOpenRounds);
     });
   });
@@ -335,23 +425,62 @@ function readFinalFormData() {
   };
 }
 
-function getMissingGroupSelectionsCount() {
-  const selects = [...groupsWrap.querySelectorAll("select[data-group-match]")];
-  return selects.filter((s) => !s.value).length;
+async function saveGroupDraft() {
+  if (!state) return;
+  if (!canEditGroup(state.participant, state.tournament)) return;
+
+  const res = await fetch(`/api/p/${token}/submit-group`, {
+    method: "POST",
+    headers: { "Content-Type": "application/json" },
+    body: JSON.stringify(readGroupFormData())
+  });
+  const data = await res.json().catch(() => ({}));
+
+  if (!res.ok) {
+    showAutosaveMessage(submitGroupMsg, data.error ?? "No se pudo guardar", true);
+    flashTouchedGroupMatches("Error al guardar", true);
+    return;
+  }
+
+  showAutosaveMessage(submitGroupMsg, `Guardado automático: ${formatDate(new Date().toISOString())}.`);
+  flashTouchedGroupMatches("Resultado guardado");
 }
 
-function getMissingFinalSelectionsCount() {
-  const selects = [...knockoutWrap.querySelectorAll("select[data-round]")];
-  return selects.filter((s) => !s.value).length;
+async function saveFinalDraft() {
+  if (!state) return;
+  if (!canEditFinal(state.participant, state.tournament)) return;
+
+  const res = await fetch(`/api/p/${token}/submit-final`, {
+    method: "POST",
+    headers: { "Content-Type": "application/json" },
+    body: JSON.stringify(readFinalFormData())
+  });
+  const data = await res.json().catch(() => ({}));
+
+  if (!res.ok) {
+    showAutosaveMessage(submitFinalMsg, data.error ?? "No se pudo guardar", true);
+    flashTouchedFinalMatches("Error al guardar", true);
+    return;
+  }
+
+  showAutosaveMessage(submitFinalMsg, `Guardado automático: ${formatDate(new Date().toISOString())}.`);
+  flashTouchedFinalMatches("Resultado guardado");
 }
 
-function getMissingBonusLabels() {
-  const missing = [];
-  if (!bonusChampion.value) missing.push("Campeón");
-  if (!bonusRunnerUp.value) missing.push("Subcampeón");
-  if (!bonusThird.value) missing.push("Tercero");
-  if (!bonusFourth.value) missing.push("Cuarto");
-  return missing;
+function scheduleGroupAutosave() {
+  showAutosaveMessage(submitGroupMsg, "Guardando...");
+  if (groupSaveTimer) clearTimeout(groupSaveTimer);
+  groupSaveTimer = setTimeout(() => {
+    void saveGroupDraft();
+  }, 350);
+}
+
+function scheduleFinalAutosave() {
+  showAutosaveMessage(submitFinalMsg, "Guardando...");
+  if (finalSaveTimer) clearTimeout(finalSaveTimer);
+  finalSaveTimer = setTimeout(() => {
+    void saveFinalDraft();
+  }, 350);
 }
 
 function setReadOnlyMode(readOnly) {
@@ -372,13 +501,6 @@ function setSectionReadOnly(section, readOnly) {
   });
 }
 
-function lockUI(lockedTime, stageLabel) {
-  submitSection.style.display = "none";
-  lockNotice.style.display = "block";
-  lockedAt.textContent = `${stageLabel} enviado: ${formatDate(lockedTime)}`;
-  setReadOnlyMode(true);
-}
-
 function applyStageLayout(participant) {
   setReadOnlyMode(false);
   lockNotice.style.display = "none";
@@ -389,40 +511,41 @@ function applyStageLayout(participant) {
 
   const groupSubmitted = Boolean(participant.predictions.groupLockedAt);
   const finalSubmitted = Boolean(participant.predictions.finalLockedAt);
+  const groupDeadline = getEditDeadline(state?.tournament?.groupMatches || []);
+  const finalDeadline = getEditDeadline(ROUND_ORDER.flatMap((round) => state?.tournament?.knockoutMatches?.[round] || []));
+  const groupClosedByTime = isPast(groupDeadline);
+  const finalClosedByTime = isPast(finalDeadline);
   const finalStageEnabled = Boolean(state?.tournament?.finalStageEnabled);
-  leaderboardSection.style.display = (groupSubmitted || finalSubmitted) ? "" : "none";
-  heroHint.style.display = finalSubmitted ? "none" : "";
+  leaderboardSection.style.display = "";
+  heroHint.style.display = "";
 
-  submitGroupBtn.disabled = groupSubmitted;
-  if (groupSubmitted) {
+  if (groupSubmitted || groupClosedByTime) {
     setSectionReadOnly(bonusSection, true);
     setSectionReadOnly(groupsSection, true);
-    submitGroupMsg.textContent = `Fase de grupos enviada: ${formatDate(participant.predictions.groupLockedAt)}.`;
+    if (groupSubmitted) {
+      showAutosaveMessage(submitGroupMsg, `Fase de grupos bloqueada manualmente: ${formatDate(participant.predictions.groupLockedAt)}.`);
+    } else {
+      showAutosaveMessage(submitGroupMsg, `Edición cerrada desde ${formatDate(groupDeadline?.toISOString())}.`);
+    }
   } else {
-    submitGroupMsg.textContent = "";
-  }
-
-  if (!groupSubmitted) {
-    setSectionReadOnly(knockoutSection, true);
-    submitFinalBtn.disabled = true;
-    submitFinalMsg.textContent = "Primero completá y enviá la fase de grupos.";
-    return;
+    showAutosaveMessage(submitGroupMsg, "Cambios con guardado automático.");
   }
 
   if (!finalStageEnabled) {
     setSectionReadOnly(knockoutSection, true);
-    submitFinalBtn.disabled = true;
-    submitFinalMsg.textContent = "La fase final todavía no está habilitada.";
+    showAutosaveMessage(submitFinalMsg, "La fase final todavía no está habilitada.");
     return;
   }
 
-  if (finalSubmitted) {
+  if (finalSubmitted || finalClosedByTime) {
     setSectionReadOnly(knockoutSection, true);
-    submitFinalBtn.disabled = true;
-    submitFinalMsg.textContent = `Fase final enviada: ${formatDate(participant.predictions.finalLockedAt)}.`;
+    if (finalSubmitted) {
+      showAutosaveMessage(submitFinalMsg, `Fase final bloqueada manualmente: ${formatDate(participant.predictions.finalLockedAt)}.`);
+    } else {
+      showAutosaveMessage(submitFinalMsg, `Edición cerrada desde ${formatDate(finalDeadline?.toISOString())}.`);
+    }
   } else {
-    submitFinalBtn.disabled = false;
-    submitFinalMsg.textContent = "";
+    showAutosaveMessage(submitFinalMsg, "Cambios con guardado automático.");
   }
 }
 
@@ -461,7 +584,7 @@ async function load() {
   if (titleText) titleText.textContent = playerPageTitle;
   else title.textContent = playerPageTitle;
   document.title = playerPageTitle;
-  subtitle.textContent = `Hola ${data.participant.name}. Completá grupos y luego fase final desde este mismo panel.`;
+  subtitle.textContent = `Hola ${data.participant.name}. Los cambios se guardan automáticamente.`;
 
   currentKnockout = {
     R16: { ...(data.participant.predictions.knockout.R16 || {}) },
@@ -498,101 +621,10 @@ async function load() {
   await showNotificationOptinOnOpen();
 }
 
-submitGroupBtn.addEventListener("click", async () => {
-  submitGroupMsg.textContent = "";
-
-  const missingBonus = getMissingBonusLabels();
-  if (missingBonus.length > 0) {
-    await openModal({
-      title: "Faltan bonus",
-      text: `Debés completar los bonus antes de enviar. Falta: ${missingBonus.join(", ")}.`,
-      confirmText: "Entendido",
-      showCancel: false
-    });
-    return;
-  }
-
-  const missingCount = getMissingGroupSelectionsCount();
-  if (missingCount > 0) {
-    await openModal({
-      title: "Faltan resultados",
-      text: `Tenés ${missingCount} partido${missingCount === 1 ? "" : "s"} sin completar. Debés cargar todos los resultados antes de enviar.`,
-      confirmText: "Entendido",
-      showCancel: false
-    });
-    return;
-  }
-
-  const confirmed = await openModal({
-    title: "Confirmar envío",
-    text: "Vas a enviar la fase de grupos. Después no vas a poder modificarla.",
-    confirmText: "Sí, enviar",
-    cancelText: "Cancelar"
+[bonusChampion, bonusRunnerUp, bonusThird, bonusFourth].forEach((el) => {
+  el.addEventListener("change", () => {
+    scheduleGroupAutosave();
   });
-  if (!confirmed) return;
-
-  const res = await fetch(`/api/p/${token}/submit-group`, {
-    method: "POST",
-    headers: { "Content-Type": "application/json" },
-    body: JSON.stringify(readGroupFormData())
-  });
-  const data = await res.json();
-
-  if (!res.ok) {
-    await openModal({
-      title: "No se pudo enviar",
-      text: data.error ?? "No se pudo guardar",
-      confirmText: "Cerrar",
-      showCancel: false
-    });
-    return;
-  }
-
-  submitGroupMsg.textContent = "Fase de grupos enviada y bloqueada.";
-  await load();
-});
-
-submitFinalBtn.addEventListener("click", async () => {
-  submitFinalMsg.textContent = "";
-
-  const missingCount = getMissingFinalSelectionsCount();
-  if (missingCount > 0) {
-    await openModal({
-      title: "Faltan resultados",
-      text: `Tenés ${missingCount} partido${missingCount === 1 ? "" : "s"} sin completar. Debés cargar todos los resultados antes de enviar.`,
-      confirmText: "Entendido",
-      showCancel: false
-    });
-    return;
-  }
-
-  const confirmed = await openModal({
-    title: "Confirmar envío",
-    text: "Vas a enviar la fase final. Después no vas a poder modificarla.",
-    confirmText: "Sí, enviar",
-    cancelText: "Cancelar"
-  });
-  if (!confirmed) return;
-
-  const res = await fetch(`/api/p/${token}/submit-final`, {
-    method: "POST",
-    headers: { "Content-Type": "application/json" },
-    body: JSON.stringify(readFinalFormData())
-  });
-  const data = await res.json();
-
-  if (!res.ok) {
-    await openModal({
-      title: "No se pudo enviar",
-      text: data.error ?? "No se pudo guardar",
-      confirmText: "Cerrar",
-      showCancel: false
-    });
-    return;
-  }
-
-  submitFinalMsg.textContent = "Fase final enviada y bloqueada.";
-  await load();
 });
 
 enableKickoffNotifBtn.addEventListener("click", async () => {
