@@ -85,6 +85,33 @@ p {
   flex-wrap: wrap;
 }
 
+.row-between-center {
+  justify-content: space-between;
+  align-items: center;
+}
+
+.row-center {
+  align-items: center;
+}
+
+.row-center-tight {
+  align-items: center;
+  gap: 8px;
+}
+
+.row-link {
+  align-items: center;
+  gap: 0.5rem;
+}
+
+.row-end {
+  justify-content: flex-end;
+}
+
+.title-no-margin {
+  margin: 0;
+}
+
 .tabs {
   display: flex;
   gap: 8px;
@@ -394,16 +421,6 @@ button:disabled {
   pointer-events: none;
 }
 
-.save-message {
-  font-size: 0.9rem;
-  color: var(--ok);
-  margin-left: 8px;
-}
-
-.save-message.error {
-  color: var(--warm);
-}
-
 .result-row {
   display: flex;
   align-items: center;
@@ -412,6 +429,23 @@ button:disabled {
 
 .result-row select {
   width: 60px;
+}
+
+.admin-result-select {
+  width: 220px;
+  min-width: 220px;
+  max-width: 220px;
+}
+
+.admin-result-cell {
+  min-width: 220px;
+  padding-bottom: 0;
+}
+
+.admin-result-cell .save-flash {
+  position: static;
+  min-height: 0;
+  margin-top: 2px;
 }
 
 #groups .result-row select,

@@ -13,9 +13,9 @@
   <body>
     <main class="container stack">
       <section class="card hero">
-        <div class="row" style="justify-content: space-between; align-items: center;">
-          <div class="row" style="align-items:center;">
-            <h1 id="title" style="margin:0;">Torneo</h1>
+        <div class="row row-between-center">
+          <div class="row row-center">
+            <h1 id="title" class="title-no-margin">Torneo</h1>
             <button id="openRenameTournamentIcon" class="icon-btn" type="button" aria-label="Cambiar nombre del torneo">✎</button>
           </div>
         </div>
@@ -98,7 +98,7 @@
         <div class="modal-card stack">
           <h3 id="renameTournamentTitle">Cambiar nombre del torneo</h3>
           <input id="renameTournamentInput" placeholder="Nombre del torneo" />
-          <div class="row" style="justify-content:flex-end;">
+          <div class="row row-end">
             <button id="renameTournamentCancel" class="secondary" type="button">Cancelar</button>
             <button id="renameTournamentSave" type="button">Guardar nombre</button>
           </div>
@@ -109,7 +109,7 @@
         <div class="modal-card stack">
           <h3 id="renameParticipantTitle">Cambiar nombre del participante</h3>
           <input id="renameParticipantInput" placeholder="Nombre del participante" />
-          <div class="row" style="justify-content:flex-end;">
+          <div class="row row-end">
             <button id="renameParticipantCancel" class="secondary" type="button">Cancelar</button>
             <button id="renameParticipantSave" type="button">Guardar nombre</button>
           </div>
@@ -120,7 +120,7 @@
         <div class="modal-card">
           <h3 id="modalTitle">Confirmar</h3>
           <p id="modalText" class="muted"></p>
-          <div class="row" style="justify-content:flex-end;">
+          <div class="row row-end">
             <button id="modalCancel" class="secondary">Cancelar</button>
             <button id="modalOk">Aceptar</button>
           </div>

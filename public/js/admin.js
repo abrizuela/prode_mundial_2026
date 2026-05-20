@@ -434,19 +434,19 @@ function renderGlobalGroupSchedule(matches) {
         <div class="stack" style="margin-top:8px;">
           ${rows
             .map((m) => `
-              <div class="match-line" style="grid-template-columns:1fr auto 60px;">
+              <div class="match-line" style="grid-template-columns:1fr auto auto;">
                 <span data-match-label>${groupMatchNumber(m.id) ? `Partido ${groupMatchNumber(m.id)} - ` : ""}${countryLabel(m.home)} vs ${countryLabel(m.away)}</span>
                 <div class="dt-cell">
                   <span class="dt-text">${formatKickoffDisplay(m.kickoffAt)}</span>
                   <button class="icon-btn" data-edit-kickoff type="button">Editar</button>
                   <input type="hidden" class="dt-input" data-global-kickoff="${m.id}" value="${toDatetimeLocalValue(m.kickoffAt)}" />
                 </div>
-                <div class="result-cell">
-                  <select data-global-group-result="${m.id}">
+                <div class="result-cell admin-result-cell">
+                  <select class="admin-result-select" data-global-group-result="${m.id}">
                     <option value="" ${!m.result ? "selected" : ""}>-</option>
-                    <option value="L" ${m.result === "L" ? "selected" : ""}>L</option>
-                    <option value="E" ${m.result === "E" ? "selected" : ""}>E</option>
-                    <option value="V" ${m.result === "V" ? "selected" : ""}>V</option>
+                    <option value="L" ${m.result === "L" ? "selected" : ""}>${countryLabel(m.home)}</option>
+                    <option value="E" ${m.result === "E" ? "selected" : ""}>🤝 Empate</option>
+                    <option value="V" ${m.result === "V" ? "selected" : ""}>${countryLabel(m.away)}</option>
                   </select>
                   <span class="save-flash"></span>
                 </div>
@@ -539,18 +539,18 @@ function renderGlobalKnockout(data) {
       const result = data.actual?.knockout?.[round]?.[matchId] ?? "";
       const kickoff = data.knockoutMatches?.[round]?.find((m) => m.id === matchId)?.kickoffAt ?? null;
       return `
-        <div class="match-line" style="grid-template-columns:1fr auto 60px;">
+        <div class="match-line" style="grid-template-columns:1fr auto auto;">
           <span data-match-label>${matchNumber ? `Partido ${matchNumber} - ` : ""}${countryLabel(teamLine.home)} vs ${countryLabel(teamLine.away)}</span>
           <div class="dt-cell">
             <span class="dt-text">${formatKickoffDisplay(kickoff)}</span>
             <button class="icon-btn" data-edit-kickoff type="button">Editar</button>
             <input type="hidden" class="dt-input" data-round-kickoff="${round}" data-match="${matchId}" value="${toDatetimeLocalValue(kickoff)}" />
           </div>
-          <div class="result-cell">
-            <select data-round="${round}" data-match="${matchId}">
+          <div class="result-cell admin-result-cell">
+            <select class="admin-result-select" data-round="${round}" data-match="${matchId}">
               <option value="" ${!result ? "selected" : ""}>-</option>
-              <option value="L" ${result === "L" ? "selected" : ""}>L</option>
-              <option value="V" ${result === "V" ? "selected" : ""}>V</option>
+              <option value="L" ${result === "L" ? "selected" : ""}>${countryLabel(teamLine.home)}</option>
+              <option value="V" ${result === "V" ? "selected" : ""}>${countryLabel(teamLine.away)}</option>
             </select>
             <span class="save-flash"></span>
           </div>

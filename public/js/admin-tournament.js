@@ -282,7 +282,7 @@ function renderParticipants(tournament) {
     links.innerHTML = `
       <div class="group-box stack">
         <strong>Link público del torneo</strong>
-        <div class="row" style="align-items:center;gap:0.5rem;">
+        <div class="row row-link">
           <a href="/t/${tournament.id}" target="_blank" rel="noreferrer">${window.location.origin}/t/${tournament.id}</a>
           <button class="icon-btn copy-btn" data-copy="${window.location.origin}/t/${tournament.id}" aria-label="Copiar link"><img src="/assets/copy.png" alt="" width="14" height="14" /></button>
         </div>
@@ -306,14 +306,14 @@ function renderParticipants(tournament) {
       return `
       <div class="group-box stack" data-participant-id="${p.id}">
         <div class="stack">
-          <div class="row" style="align-items:center; gap:8px;">
+          <div class="row row-center-tight">
             <strong>${p.name}</strong>
             <button class="icon-btn" data-action="open-rename-participant" type="button" aria-label="Cambiar nombre del participante">✎</button>
             ${notifStatus}
             ${p.groupLockedAt ? "<span class='tag'>Grupos enviado</span>" : ""}
             ${p.finalLockedAt ? "<span class='tag'>Final enviado</span>" : ""}
           </div>
-          <div class="row" style="align-items:center;gap:0.5rem;">
+          <div class="row row-link">
             <a href="${p.playerUrl || p.groupUrl}" target="_blank" rel="noreferrer">${url}</a>
             <button class="icon-btn copy-btn" data-copy="${url}" aria-label="Copiar link"><img src="/assets/copy.png" alt="" width="14" height="14" /></button>
           </div>
@@ -332,7 +332,7 @@ function renderParticipants(tournament) {
   links.innerHTML = `
     <div class="group-box stack">
       <strong>Link público del torneo</strong>
-      <div class="row" style="align-items:center;gap:0.5rem;">
+      <div class="row row-link">
         <a href="/t/${tournament.id}" target="_blank" rel="noreferrer">${window.location.origin}/t/${tournament.id}</a>
         <button class="icon-btn copy-btn" data-copy="${window.location.origin}/t/${tournament.id}" aria-label="Copiar link"><img src="/assets/copy.png" alt="" width="14" height="14" /></button>
       </div>
