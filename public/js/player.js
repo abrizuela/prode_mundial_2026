@@ -43,8 +43,6 @@ const knockoutStageDetails = document.querySelector("#knockoutStageDetails");
 const enableKickoffNotifBtn = document.querySelector("#enableKickoffNotif");
 const disableKickoffNotifBtn = document.querySelector("#disableKickoffNotif");
 const notifStatus = document.querySelector("#notifStatus");
-const refreshDataBtn = document.querySelector("#refreshDataBtn");
-const refreshDataMsg = document.querySelector("#refreshDataMsg");
 
 const modal = document.querySelector("#appModal");
 const modalTitle = document.querySelector("#modalTitle");
@@ -114,19 +112,22 @@ function hasKickoffStarted(kickoffAt) {
 
 function refreshPhaseNotice() {
   if (!phaseNotice) return;
+  const finalStageEnabled = Boolean(state?.tournament?.finalStageEnabled);
 
   const groupPending = [...groupsWrap.querySelectorAll("select[data-group-match]")]
     .filter((select) => !select.disabled && !select.value)
     .length;
-  const finalPending = [...knockoutWrap.querySelectorAll("select[data-round]")]
-    .filter((select) => !select.disabled && !select.value)
-    .length;
+  const finalPending = finalStageEnabled
+    ? [...knockoutWrap.querySelectorAll("select[data-round]")]
+      .filter((select) => !select.disabled && !select.value)
+      .length
+    : 0;
 
   const parts = [];
   if (groupPending > 0) {
     parts.push(`Fase de grupos incompleta: faltan ${groupPending} resultado(s).`);
   }
-  if (finalPending > 0) {
+  if (finalStageEnabled && finalPending > 0) {
     parts.push(`Fase final incompleta: faltan ${finalPending} resultado(s).`);
   }
 
@@ -664,7 +665,6 @@ async function showNotificationOptinOnOpen() {
 async function load() {
   if (isLoading) return;
   isLoading = true;
-  if (refreshDataBtn) refreshDataBtn.disabled = true;
 
   try {
     const res = await fetch(`/api/p/${token}?_ts=${Date.now()}`, { cache: "no-store" });
@@ -718,15 +718,8 @@ async function load() {
     refreshNotificationStatus();
     await showNotificationOptinOnOpen();
   } finally {
-    if (refreshDataBtn) refreshDataBtn.disabled = false;
     isLoading = false;
   }
-}
-
-function showRefreshMessage(text, isError = false) {
-  if (!refreshDataMsg) return;
-  refreshDataMsg.textContent = text;
-  refreshDataMsg.style.color = isError ? "#a62d2d" : "";
 }
 
 [bonusChampion, bonusRunnerUp, bonusThird, bonusFourth].forEach((el) => {
@@ -741,17 +734,6 @@ enableKickoffNotifBtn.addEventListener("click", async () => {
 
 disableKickoffNotifBtn.addEventListener("click", async () => {
   await unregisterPushSubscription();
-});
-
-refreshDataBtn?.addEventListener("click", async () => {
-  if (isLoading) return;
-  showRefreshMessage("Actualizando...");
-  try {
-    await load();
-    showRefreshMessage("Actualizado.");
-  } catch {
-    showRefreshMessage("No se pudo actualizar.", true);
-  }
 });
 
 initSectionCollapseControls();
