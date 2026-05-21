@@ -18,6 +18,7 @@ const title = document.querySelector("#title");
 const titleText = title?.querySelector("span");
 const subtitle = document.querySelector("#subtitle");
 const heroHint = document.querySelector("#heroHint");
+const phaseNotice = document.querySelector("#phaseNotice");
 const leaderboardSection = document.querySelector("#leaderboardSection");
 const groupsWrap = document.querySelector("#groups");
 const knockoutWrap = document.querySelector("#knockout");
@@ -40,6 +41,8 @@ const knockoutSection = document.querySelector("#knockoutSection");
 const enableKickoffNotifBtn = document.querySelector("#enableKickoffNotif");
 const disableKickoffNotifBtn = document.querySelector("#disableKickoffNotif");
 const notifStatus = document.querySelector("#notifStatus");
+const refreshDataBtn = document.querySelector("#refreshDataBtn");
+const refreshDataMsg = document.querySelector("#refreshDataMsg");
 
 const modal = document.querySelector("#appModal");
 const modalTitle = document.querySelector("#modalTitle");
@@ -48,6 +51,7 @@ const modalCancel = document.querySelector("#modalCancel");
 const modalOk = document.querySelector("#modalOk");
 
 let state = null;
+let isLoading = false;
 const flashTimers = new WeakMap();
 const NOTIF_ENABLED_KEY = `prode_push_enabled_${token}`;
 const NOTIF_MODAL_SEEN_KEY = `prode_push_modal_seen_${token}`;
@@ -89,18 +93,40 @@ function isPast(dateOrNull) {
 }
 
 function canEditGroup(participant, tournament) {
-  if (participant.predictions.groupLockedAt) return false;
-  const deadline = getEditDeadline(tournament.groupMatches || []);
-  return !isPast(deadline);
+  return Boolean(tournament);
 }
 
 function canEditFinal(participant, tournament) {
   if (!tournament.finalStageEnabled) return false;
-  if (participant.predictions.finalLockedAt) return false;
+  return true;
+}
 
-  const allKnockoutMatches = ROUND_ORDER.flatMap((round) => tournament.knockoutMatches?.[round] || []);
-  const deadline = getEditDeadline(allKnockoutMatches);
-  return !isPast(deadline);
+function hasKickoffStarted(kickoffAt) {
+  if (!kickoffAt) return false;
+  const kickoffTs = new Date(kickoffAt).getTime();
+  if (!Number.isFinite(kickoffTs)) return false;
+  return Date.now() >= kickoffTs;
+}
+
+function refreshPhaseNotice() {
+  if (!phaseNotice) return;
+
+  const groupPending = [...groupsWrap.querySelectorAll("select[data-group-match]")]
+    .filter((select) => !select.disabled && !select.value)
+    .length;
+  const finalPending = [...knockoutWrap.querySelectorAll("select[data-round]")]
+    .filter((select) => !select.disabled && !select.value)
+    .length;
+
+  const parts = [];
+  if (groupPending > 0) {
+    parts.push(`Fase de grupos incompleta: faltan ${groupPending} resultado(s).`);
+  }
+  if (finalPending > 0) {
+    parts.push(`Fase final incompleta: faltan ${finalPending} resultado(s).`);
+  }
+
+  phaseNotice.textContent = parts.join(" ");
 }
 
 function showAutosaveMessage(el, text, isError = false) {
@@ -355,9 +381,9 @@ function renderGroups(tournament, predictions, options = {}) {
                 <div class="dt-cell">
                   <span class="dt-text">${m.kickoffAt ? formatDate(m.kickoffAt) : "Sin fecha"}</span>
                 </div>
-                <div class="result-cell">
+                <div class="result-cell player-result-cell">
                   <div class="result-row">
-                    <select data-group-match="${m.id}">
+                    <select data-group-match="${m.id}" ${hasKickoffStarted(m.kickoffAt) ? "disabled" : ""}>
                       ${renderGroupResultOptions(m, predictions.group[m.id])}
                     </select>
                     ${getGroupOutcomeMark(m.id, predictions.group[m.id])}
@@ -376,10 +402,12 @@ function renderGroups(tournament, predictions, options = {}) {
     s.addEventListener("change", () => {
       touchedGroupMatches.add(s.dataset.groupMatch);
       scheduleGroupAutosave();
+      refreshPhaseNotice();
     });
   });
 
   syncPredictionSelectWidths();
+  refreshPhaseNotice();
 }
 
 function renderKnockout(tournament, openRounds) {
@@ -401,9 +429,9 @@ function renderKnockout(tournament, openRounds) {
           <div class="dt-cell">
             <span class="dt-text">${kickoff ? formatDate(kickoff) : "Sin fecha"}</span>
           </div>
-          <div class="result-cell">
+          <div class="result-cell player-result-cell">
             <div class="result-row">
-              <select data-round="${round}" data-match="${matchId}">
+              <select data-round="${round}" data-match="${matchId}" ${hasKickoffStarted(kickoff) ? "disabled" : ""}>
                 ${renderKnockoutResultOptions(t.home, t.away, currentKnockout[round][matchId])}
               </select>
               ${getKnockoutOutcomeMark(round, matchId, currentKnockout[round][matchId])}
@@ -444,6 +472,7 @@ function renderKnockout(tournament, openRounds) {
   });
 
   syncPredictionSelectWidths();
+  refreshPhaseNotice();
 }
 
 function readGroupFormData() {
@@ -526,18 +555,6 @@ function scheduleFinalAutosave() {
   }, 350);
 }
 
-function setReadOnlyMode(readOnly) {
-  const editableFields = [
-    ...bonusSection.querySelectorAll("select, input, textarea"),
-    ...groupsSection.querySelectorAll("select, input, textarea"),
-    ...knockoutSection.querySelectorAll("select, input, textarea")
-  ];
-
-  editableFields.forEach((el) => {
-    el.disabled = readOnly;
-  });
-}
-
 function setSectionReadOnly(section, readOnly) {
   section.querySelectorAll("select, input, textarea").forEach((el) => {
     el.disabled = readOnly;
@@ -545,15 +562,15 @@ function setSectionReadOnly(section, readOnly) {
 }
 
 function applyStageLayout(participant) {
-  setReadOnlyMode(false);
+  // Group/knockout per-match disabled state is applied at render time and must
+  // not be globally re-enabled here.
+  setSectionReadOnly(bonusSection, false);
   lockNotice.style.display = "none";
   lockedAt.textContent = "";
   bonusSection.style.display = "block";
   groupsSection.style.display = "block";
   knockoutSection.style.display = "block";
 
-  const groupSubmitted = Boolean(participant.predictions.groupLockedAt);
-  const finalSubmitted = Boolean(participant.predictions.finalLockedAt);
   const groupDeadline = getEditDeadline(state?.tournament?.groupMatches || []);
   const finalDeadline = getEditDeadline(ROUND_ORDER.flatMap((round) => state?.tournament?.knockoutMatches?.[round] || []));
   const groupClosedByTime = isPast(groupDeadline);
@@ -562,14 +579,9 @@ function applyStageLayout(participant) {
   leaderboardSection.style.display = "";
   heroHint.style.display = "";
 
-  if (groupSubmitted || groupClosedByTime) {
+  if (groupClosedByTime) {
     setSectionReadOnly(bonusSection, true);
-    setSectionReadOnly(groupsSection, true);
-    if (groupSubmitted) {
-      showAutosaveMessage(submitGroupMsg, `Fase de grupos bloqueada manualmente: ${formatDate(participant.predictions.groupLockedAt)}.`);
-    } else {
-      showAutosaveMessage(submitGroupMsg, `Edición cerrada desde ${formatDate(groupDeadline?.toISOString())}.`);
-    }
+    showAutosaveMessage(submitGroupMsg, "Los partidos iniciados no se pueden editar.");
   } else {
     showAutosaveMessage(submitGroupMsg, "Cambios con guardado automático.");
   }
@@ -580,16 +592,13 @@ function applyStageLayout(participant) {
     return;
   }
 
-  if (finalSubmitted || finalClosedByTime) {
-    setSectionReadOnly(knockoutSection, true);
-    if (finalSubmitted) {
-      showAutosaveMessage(submitFinalMsg, `Fase final bloqueada manualmente: ${formatDate(participant.predictions.finalLockedAt)}.`);
-    } else {
-      showAutosaveMessage(submitFinalMsg, `Edición cerrada desde ${formatDate(finalDeadline?.toISOString())}.`);
-    }
+  if (finalClosedByTime) {
+    showAutosaveMessage(submitFinalMsg, "Los partidos iniciados no se pueden editar.");
   } else {
     showAutosaveMessage(submitFinalMsg, "Cambios con guardado automático.");
   }
+
+  refreshPhaseNotice();
 }
 
 async function showNotificationOptinOnOpen() {
@@ -612,56 +621,71 @@ async function showNotificationOptinOnOpen() {
 }
 
 async function load() {
-  const res = await fetch(`/api/p/${token}`);
-  const data = await res.json();
+  if (isLoading) return;
+  isLoading = true;
+  if (refreshDataBtn) refreshDataBtn.disabled = true;
 
-  if (!res.ok) {
-    title.textContent = "Link inválido";
-    subtitle.textContent = data.error ?? "No se encontro informacion";
-    return;
+  try {
+    const res = await fetch(`/api/p/${token}?_ts=${Date.now()}`, { cache: "no-store" });
+    const data = await res.json();
+
+    if (!res.ok) {
+      title.textContent = "Link inválido";
+      subtitle.textContent = data.error ?? "No se encontro informacion";
+      return;
+    }
+
+    state = data;
+
+    const playerPageTitle = `PRODE Mundial 2026: ${data.tournament.name}`;
+    if (titleText) titleText.textContent = playerPageTitle;
+    else title.textContent = playerPageTitle;
+    document.title = playerPageTitle;
+    subtitle.textContent = `Hola ${data.participant.name}. Los cambios se guardan automáticamente.`;
+
+    currentKnockout = {
+      R16: { ...(data.participant.predictions.knockout.R16 || {}) },
+      OCT: { ...(data.participant.predictions.knockout.OCT || {}) },
+      QF: { ...(data.participant.predictions.knockout.QF || {}) },
+      SF: { ...(data.participant.predictions.knockout.SF || {}) },
+      THIRD: { ...(data.participant.predictions.knockout.THIRD || {}) },
+      FINAL: { ...(data.participant.predictions.knockout.FINAL || {}) }
+    };
+
+    const allTeams = [...new Set(
+      data.tournament.groupMatches.flatMap((m) => [m.home, m.away])
+    )].sort((a, b) => a.localeCompare(b, "es"));
+
+    const bonusOptions = `<option value="">Seleccionar</option>` +
+      allTeams.map((t) => `<option value="${t}">${countryLabel(t)}</option>`).join("");
+
+    for (const sel of [bonusChampion, bonusRunnerUp, bonusThird, bonusFourth]) {
+      sel.innerHTML = bonusOptions;
+    }
+
+    bonusChampion.value = data.participant.predictions.bonus.champion || "";
+    bonusRunnerUp.value = data.participant.predictions.bonus.runnerUp || "";
+    bonusThird.value = data.participant.predictions.bonus.third || "";
+    bonusFourth.value = data.participant.predictions.bonus.fourth || "";
+
+    const groupClosedByTime = isPast(getEditDeadline(data.tournament.groupMatches || []));
+    renderGroups(data.tournament, data.participant.predictions, { collapsed: groupClosedByTime });
+    renderKnockout(data.tournament);
+    leaderboardEl.innerHTML = leaderboardTable(data.leaderboard);
+
+    applyStageLayout(data.participant);
+    refreshNotificationStatus();
+    await showNotificationOptinOnOpen();
+  } finally {
+    if (refreshDataBtn) refreshDataBtn.disabled = false;
+    isLoading = false;
   }
+}
 
-  state = data;
-
-  const playerPageTitle = `PRODE Mundial 2026: ${data.tournament.name}`;
-  if (titleText) titleText.textContent = playerPageTitle;
-  else title.textContent = playerPageTitle;
-  document.title = playerPageTitle;
-  subtitle.textContent = `Hola ${data.participant.name}. Los cambios se guardan automáticamente.`;
-
-  currentKnockout = {
-    R16: { ...(data.participant.predictions.knockout.R16 || {}) },
-    OCT: { ...(data.participant.predictions.knockout.OCT || {}) },
-    QF: { ...(data.participant.predictions.knockout.QF || {}) },
-    SF: { ...(data.participant.predictions.knockout.SF || {}) },
-    THIRD: { ...(data.participant.predictions.knockout.THIRD || {}) },
-    FINAL: { ...(data.participant.predictions.knockout.FINAL || {}) }
-  };
-
-  const allTeams = [...new Set(
-    data.tournament.groupMatches.flatMap((m) => [m.home, m.away])
-  )].sort((a, b) => a.localeCompare(b, "es"));
-
-  const bonusOptions = `<option value="">Seleccionar</option>` +
-    allTeams.map((t) => `<option value="${t}">${countryLabel(t)}</option>`).join("");
-
-  for (const sel of [bonusChampion, bonusRunnerUp, bonusThird, bonusFourth]) {
-    sel.innerHTML = bonusOptions;
-  }
-
-  bonusChampion.value = data.participant.predictions.bonus.champion || "";
-  bonusRunnerUp.value = data.participant.predictions.bonus.runnerUp || "";
-  bonusThird.value = data.participant.predictions.bonus.third || "";
-  bonusFourth.value = data.participant.predictions.bonus.fourth || "";
-
-  const groupAlreadySubmitted = Boolean(data.participant.predictions.groupLockedAt);
-  renderGroups(data.tournament, data.participant.predictions, { collapsed: groupAlreadySubmitted });
-  renderKnockout(data.tournament);
-  leaderboardEl.innerHTML = leaderboardTable(data.leaderboard);
-
-  applyStageLayout(data.participant);
-  refreshNotificationStatus();
-  await showNotificationOptinOnOpen();
+function showRefreshMessage(text, isError = false) {
+  if (!refreshDataMsg) return;
+  refreshDataMsg.textContent = text;
+  refreshDataMsg.style.color = isError ? "#a62d2d" : "";
 }
 
 [bonusChampion, bonusRunnerUp, bonusThird, bonusFourth].forEach((el) => {
@@ -678,4 +702,15 @@ disableKickoffNotifBtn.addEventListener("click", async () => {
   await unregisterPushSubscription();
 });
 
-load();
+refreshDataBtn?.addEventListener("click", async () => {
+  if (isLoading) return;
+  showRefreshMessage("Actualizando...");
+  try {
+    await load();
+    showRefreshMessage("Actualizado.");
+  } catch {
+    showRefreshMessage("No se pudo actualizar.", true);
+  }
+});
+
+void load();

@@ -308,6 +308,10 @@ button:disabled {
   transition: opacity 0.2s ease;
 }
 
+.notice-warning {
+  color: #a06207;
+}
+
 .muted {
   color: var(--muted);
 }
@@ -421,6 +425,12 @@ button:disabled {
   pointer-events: none;
 }
 
+.save-flash-inline {
+  position: static;
+  min-height: 0;
+  margin-left: 6px;
+}
+
 .result-row {
   display: flex;
   align-items: center;
@@ -443,6 +453,17 @@ button:disabled {
 }
 
 .admin-result-cell .save-flash {
+  position: static;
+  min-height: 0;
+  margin-top: 2px;
+}
+
+.player-result-cell {
+  min-width: 220px;
+  padding-bottom: 0;
+}
+
+.player-result-cell .save-flash {
   position: static;
   min-height: 0;
   margin-top: 2px;
@@ -497,6 +518,11 @@ button:disabled {
   border: none;
   border-radius: 0;
   padding: 0;
+}
+
+#refreshDataMsg {
+  margin: 0;
+  min-height: 1.2em;
 }
 
 .submit-inline {

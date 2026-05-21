@@ -15,6 +15,12 @@ const PUSH_CHECK_INTERVAL_MS = 30_000;
 
 app.use(express.json({ limit: "2mb" }));
 app.use(express.static(path.join(process.cwd(), "public")));
+app.use("/api", (_req, res, next) => {
+  res.setHeader("Cache-Control", "no-store, no-cache, must-revalidate, proxy-revalidate");
+  res.setHeader("Pragma", "no-cache");
+  res.setHeader("Expires", "0");
+  next();
+});
 
 function readAdminKey(req: express.Request) {
   const header = req.header("x-admin-key");
@@ -175,6 +181,13 @@ function hasEditWindowClosed(kickoffAtList: Array<string | null | undefined>) {
   return Date.now() >= (firstKickoff - 60 * 60 * 1000);
 }
 
+function hasKickoffStarted(kickoffAt: string | null | undefined) {
+  if (!kickoffAt) return false;
+  const kickoffTs = new Date(kickoffAt).getTime();
+  if (!Number.isFinite(kickoffTs)) return false;
+  return Date.now() >= kickoffTs;
+}
+
 app.get("/", (_req, res) => {
   res.sendFile(path.join(process.cwd(), "public", "html", "admin.html"));
 });
@@ -237,10 +250,16 @@ app.patch("/api/admin/group-schedule", requireAdmin, (req, res) => {
     }
   }
 
-  const nextResults: Record<string, GroupResult> = {};
+  const nextResults: Record<string, GroupResult> = { ...store.globalActual.group };
   for (const [matchId, value] of Object.entries(resultInput)) {
     if (isGroupResult(value)) {
       nextResults[matchId] = value;
+      continue;
+    }
+
+    // Allow clearing an already-saved result by sending empty string.
+    if (typeof value === "string" && value.trim() === "") {
+      delete nextResults[matchId];
     }
   }
 
@@ -769,18 +788,8 @@ app.post("/api/tournaments/:id/participants/:participantId/unlock", requireAdmin
     return;
   }
 
-  const stage = typeof req.body?.stage === "string" ? req.body.stage : "group";
-  if (stage !== "group" && stage !== "final") {
-    res.status(400).json({ error: "Etapa inválida" });
-    return;
-  }
-
-  if (stage === "final") {
-    participant.predictions.finalLockedAt = null;
-  } else {
-    participant.predictions.groupLockedAt = null;
-    participant.predictions.finalLockedAt = null;
-  }
+  participant.predictions.groupLockedAt = null;
+  participant.predictions.finalLockedAt = null;
 
   writeStore(store);
   res.json({ ok: true });
@@ -1035,33 +1044,31 @@ app.post("/api/p/:token/submit-group", (req, res) => {
   const participant = tournament.participants[participantIndex];
   const projectedTournament = withGlobalTournamentData(store, tournament);
 
-  if (participant.predictions.groupLockedAt) {
-    res.status(409).json({ error: "La fase de grupos está bloqueada por admin" });
-    return;
-  }
-
-  if (hasEditWindowClosed(projectedTournament.groupMatches.map((m) => m.kickoffAt))) {
-    res.status(409).json({ error: "La edición de fase de grupos cerró una hora antes del primer partido" });
-    return;
-  }
-
   const groupInput = req.body?.group ?? {};
   const bonusInput = req.body?.bonus ?? {};
 
-  const group: Record<string, GroupResult> = {};
-  for (const [matchId, value] of Object.entries(groupInput)) {
+  const nextGroup: Record<string, GroupResult> = { ...participant.predictions.group };
+  for (const match of projectedTournament.groupMatches) {
+    if (hasKickoffStarted(match.kickoffAt)) continue;
+    const value = groupInput[match.id];
     if (isGroupResult(value)) {
-      group[matchId] = value;
+      nextGroup[match.id] = value;
+    } else {
+      delete nextGroup[match.id];
     }
   }
 
-  participant.predictions.group = group;
-  participant.predictions.bonus = {
-    champion: typeof bonusInput.champion === "string" ? bonusInput.champion.trim() : "",
-    runnerUp: typeof bonusInput.runnerUp === "string" ? bonusInput.runnerUp.trim() : "",
-    third: typeof bonusInput.third === "string" ? bonusInput.third.trim() : "",
-    fourth: typeof bonusInput.fourth === "string" ? bonusInput.fourth.trim() : ""
-  };
+  participant.predictions.group = nextGroup;
+
+  const firstGroupKickoffStarted = projectedTournament.groupMatches.some((m) => hasKickoffStarted(m.kickoffAt));
+  if (!firstGroupKickoffStarted) {
+    participant.predictions.bonus = {
+      champion: typeof bonusInput.champion === "string" ? bonusInput.champion.trim() : "",
+      runnerUp: typeof bonusInput.runnerUp === "string" ? bonusInput.runnerUp.trim() : "",
+      third: typeof bonusInput.third === "string" ? bonusInput.third.trim() : "",
+      fourth: typeof bonusInput.fourth === "string" ? bonusInput.fourth.trim() : ""
+    };
+  }
 
   writeStore(store);
   res.json({ ok: true, savedAt: new Date().toISOString() });
@@ -1095,24 +1102,26 @@ app.post("/api/p/:token/submit-final", (req, res) => {
     return;
   }
 
-  if (participant.predictions.finalLockedAt) {
-    res.status(409).json({ error: "La fase final está bloqueada por admin" });
-    return;
-  }
-
-  const allKnockoutKickoff = ROUND_ORDER.flatMap((round) => projectedTournament.knockoutMatches[round].map((m) => m.kickoffAt));
-  if (hasEditWindowClosed(allKnockoutKickoff)) {
-    res.status(409).json({ error: "La edición de fase final cerró una hora antes del primer partido" });
-    return;
-  }
-
   const knockoutInput = req.body?.knockout ?? {};
-  const knockout = emptyKnockoutPredictions();
+  const knockout = {
+    R16: { ...participant.predictions.knockout.R16 },
+    OCT: { ...participant.predictions.knockout.OCT },
+    QF: { ...participant.predictions.knockout.QF },
+    SF: { ...participant.predictions.knockout.SF },
+    THIRD: { ...participant.predictions.knockout.THIRD },
+    FINAL: { ...participant.predictions.knockout.FINAL }
+  };
+
   for (const round of ROUND_ORDER) {
     const roundInput = knockoutInput[round] ?? {};
-    for (const [matchId, value] of Object.entries(roundInput)) {
+    for (const match of projectedTournament.knockoutMatches[round]) {
+      if (hasKickoffStarted(match.kickoffAt)) continue;
+      const matchId = match.id;
+      const value = roundInput[matchId];
       if (isKnockoutResult(value)) {
         knockout[round][matchId] = value;
+      } else {
+        delete knockout[round][matchId];
       }
     }
   }

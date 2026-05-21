@@ -89,10 +89,14 @@ function normalizeStore(raw: unknown): Store {
     ...(obj.globalGroupKickoffAt ?? {})
   };
 
-  // Migrate legacy per-tournament kickoff values into global map if present.
+  // Migrate legacy per-tournament kickoff values into the global map only when
+  // there is no persisted global kickoff value yet for that match.
   for (const t of tournaments) {
     for (const match of t.groupMatches ?? []) {
-      if (match?.id && typeof match.kickoffAt === "string" && match.kickoffAt.trim()) {
+      if (!match?.id) continue;
+      if (typeof match.kickoffAt !== "string" || !match.kickoffAt.trim()) continue;
+      const hasPersistedGlobal = typeof globalGroupKickoffAt[match.id] === "string" && globalGroupKickoffAt[match.id]!.trim().length > 0;
+      if (!hasPersistedGlobal) {
         globalGroupKickoffAt[match.id] = match.kickoffAt;
       }
     }

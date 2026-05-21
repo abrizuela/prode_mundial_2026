@@ -297,8 +297,6 @@ function renderParticipants(tournament) {
 
   const participantsHtml = tournament.participants
     .map((p) => {
-      const canUnlockGroup = Boolean(p.groupLockedAt);
-      const canUnlockFinal = Boolean(p.finalLockedAt);
       const url = `${window.location.origin}${p.playerUrl || p.groupUrl}`;
       const notifStatus = p.notificationsEnabled
         ? "<span class='status-chip is-on'>Notificaciones activas</span>"
@@ -310,8 +308,6 @@ function renderParticipants(tournament) {
             <strong>${p.name}</strong>
             <button class="icon-btn" data-action="open-rename-participant" type="button" aria-label="Cambiar nombre del participante">✎</button>
             ${notifStatus}
-            ${p.groupLockedAt ? "<span class='tag'>Grupos enviado</span>" : ""}
-            ${p.finalLockedAt ? "<span class='tag'>Final enviado</span>" : ""}
           </div>
           <div class="row row-link">
             <a href="${p.playerUrl || p.groupUrl}" target="_blank" rel="noreferrer">${url}</a>
@@ -320,8 +316,6 @@ function renderParticipants(tournament) {
         </div>
         <div class="row">
           <button class='secondary' data-action='notify-participant'>Notificar</button>
-          <button class='secondary' data-action='unlock-group' ${canUnlockGroup ? "" : "disabled"}>Habilitar edición Fase de Grupos</button>
-          <button class='secondary' data-action='unlock-final' ${canUnlockFinal ? "" : "disabled"}>Habilitar edición Fase Final</button>
           <button class="danger" data-action="delete-participant">Eliminar</button>
         </div>
       </div>
@@ -383,72 +377,6 @@ function renderParticipants(tournament) {
       });
 
       if (!res.ok) return;
-      await load();
-    });
-  });
-
-  links.querySelectorAll("button[data-action='unlock-group']").forEach((btn) => {
-    btn.addEventListener("click", async () => {
-      if (btn.disabled) return;
-      const card = btn.closest("[data-participant-id]");
-      const participantId = card?.dataset.participantId;
-      if (!participantId) return;
-
-      const confirmed = await openModal({
-        title: "Habilitar edición Fase de Grupos",
-        text: "Se habilitará nuevamente la fase de grupos para este participante.",
-        confirmText: "Habilitar"
-      });
-      if (!confirmed) return;
-
-      const res = await fetch(`/api/tournaments/${tournamentId}/participants/${participantId}/unlock`, {
-        method: "POST",
-        headers: adminHeaders({ "Content-Type": "application/json" }),
-        body: JSON.stringify({ stage: "group" })
-      });
-
-      if (!res.ok) {
-        const data = await res.json().catch(() => ({}));
-        await openModal({
-          title: "No se pudo habilitar",
-          text: data.error ?? "No se pudo habilitar la fase de grupos.",
-          confirmText: "Cerrar"
-        });
-        return;
-      }
-      await load();
-    });
-  });
-
-  links.querySelectorAll("button[data-action='unlock-final']").forEach((btn) => {
-    btn.addEventListener("click", async () => {
-      if (btn.disabled) return;
-      const card = btn.closest("[data-participant-id]");
-      const participantId = card?.dataset.participantId;
-      if (!participantId) return;
-
-      const confirmed = await openModal({
-        title: "Habilitar edición Fase Final",
-        text: "Se habilitará nuevamente la fase final para este participante.",
-        confirmText: "Habilitar"
-      });
-      if (!confirmed) return;
-
-      const res = await fetch(`/api/tournaments/${tournamentId}/participants/${participantId}/unlock`, {
-        method: "POST",
-        headers: adminHeaders({ "Content-Type": "application/json" }),
-        body: JSON.stringify({ stage: "final" })
-      });
-
-      if (!res.ok) {
-        const data = await res.json().catch(() => ({}));
-        await openModal({
-          title: "No se pudo habilitar",
-          text: data.error ?? "No se pudo habilitar la fase final.",
-          confirmText: "Cerrar"
-        });
-        return;
-      }
       await load();
     });
   });

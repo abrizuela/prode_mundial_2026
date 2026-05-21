@@ -206,6 +206,7 @@ function wireDtCells(container, onSave) {
     const btn = cell.querySelector("[data-edit-kickoff]");
     const input = cell.querySelector(".dt-input");
     const display = cell.querySelector(".dt-text");
+    const inlineFlash = cell.querySelector(".save-flash-inline");
     btn.addEventListener("click", async () => {
       const matchLabel = getMatchLabel(cell);
       const next = await openDatetimeModal({
@@ -215,22 +216,24 @@ function wireDtCells(container, onSave) {
       if (next === null) return;
       input.value = next;
       display.textContent = next ? formatKickoffDisplay(next) : "Sin fecha";
-      if (onSave) await onSave(input, next);
+      if (onSave) await onSave(input, next, inlineFlash);
     });
   });
 }
 
-async function saveGroupKickoff(matchId, value) {
+async function saveGroupKickoff(matchId, value, inlineFlash) {
   const res = await fetch("/api/admin/group-schedule", {
     method: "PATCH",
     headers: adminHeaders({ "Content-Type": "application/json" }),
     body: JSON.stringify({ kickoffAt: { [matchId]: value || "" }, results: {} })
   });
   if (!res.ok) {
-    flashMessage(globalScheduleMsg, "Error al guardar horario", true);
+    if (inlineFlash) flashMessage(inlineFlash, "Error al guardar", true);
+    else flashMessage(globalScheduleMsg, "Error al guardar horario", true);
     return;
   }
-  flashMessage(globalScheduleMsg, "Cambios guardados.");
+  if (inlineFlash) flashMessage(inlineFlash, "Cambios guardados");
+  else flashMessage(globalScheduleMsg, "Cambios guardados.");
 }
 
 async function saveGroupResults(results) {
@@ -259,17 +262,19 @@ async function saveKnockoutResults(round, results) {
   return true;
 }
 
-async function saveKnockoutKickoff(round, matchId, value) {
+async function saveKnockoutKickoff(round, matchId, value, inlineFlash) {
   const res = await fetch("/api/admin/knockout/kickoff", {
     method: "PATCH",
     headers: adminHeaders({ "Content-Type": "application/json" }),
     body: JSON.stringify({ round, kickoffAt: { [matchId]: value || "" } })
   });
   if (!res.ok) {
-    flashMessage(globalKnockoutMsg, "Error al guardar horario", true);
+    if (inlineFlash) flashMessage(inlineFlash, "Error al guardar", true);
+    else flashMessage(globalKnockoutMsg, "Error al guardar horario", true);
     return;
   }
-  flashMessage(globalKnockoutMsg, `Cambios guardados en ${roundLabel(round)}.`);
+  if (inlineFlash) flashMessage(inlineFlash, "Cambios guardados");
+  else flashMessage(globalKnockoutMsg, `Cambios guardados en ${roundLabel(round)}.`);
 }
 
 function byGroup(matches) {
@@ -440,6 +445,7 @@ function renderGlobalGroupSchedule(matches) {
                   <span class="dt-text">${formatKickoffDisplay(m.kickoffAt)}</span>
                   <button class="icon-btn" data-edit-kickoff type="button">Editar</button>
                   <input type="hidden" class="dt-input" data-global-kickoff="${m.id}" value="${toDatetimeLocalValue(m.kickoffAt)}" />
+                  <span class="save-flash save-flash-inline"></span>
                 </div>
                 <div class="result-cell admin-result-cell">
                   <select class="admin-result-select" data-global-group-result="${m.id}">
@@ -506,6 +512,7 @@ function renderR16Editor(data) {
           <span class="dt-text">${formatKickoffDisplay(m.kickoffAt)}</span>
           <button class="icon-btn" data-edit-kickoff type="button">Editar</button>
           <input type="hidden" class="dt-input" data-r16-kickoff="${m.id}" value="${toDatetimeLocalValue(m.kickoffAt)}" />
+                  <span class="save-flash save-flash-inline"></span>
         </div>
       </div>
     `)
@@ -545,6 +552,7 @@ function renderGlobalKnockout(data) {
             <span class="dt-text">${formatKickoffDisplay(kickoff)}</span>
             <button class="icon-btn" data-edit-kickoff type="button">Editar</button>
             <input type="hidden" class="dt-input" data-round-kickoff="${round}" data-match="${matchId}" value="${toDatetimeLocalValue(kickoff)}" />
+            <span class="save-flash save-flash-inline"></span>
           </div>
           <div class="result-cell admin-result-cell">
             <select class="admin-result-select" data-round="${round}" data-match="${matchId}">
