@@ -38,6 +38,8 @@ const bonusFourth = document.querySelector("#bonusFourth");
 const bonusSection = document.querySelector("#bonusSection");
 const groupsSection = document.querySelector("#groupsSection");
 const knockoutSection = document.querySelector("#knockoutSection");
+const groupsStageDetails = document.querySelector("#groupsStageDetails");
+const knockoutStageDetails = document.querySelector("#knockoutStageDetails");
 const enableKickoffNotifBtn = document.querySelector("#enableKickoffNotif");
 const disableKickoffNotifBtn = document.querySelector("#disableKickoffNotif");
 const notifStatus = document.querySelector("#notifStatus");
@@ -67,6 +69,8 @@ let groupSaveTimer = null;
 let finalSaveTimer = null;
 const touchedGroupMatches = new Set();
 const touchedFinalMatches = new Set();
+const GROUPS_COLLAPSED_KEY = "prode_player_groups_collapsed";
+const KNOCKOUT_COLLAPSED_KEY = "prode_player_knockout_collapsed";
 
 const ROUND_LABELS = {
   R16: "16vos de final",
@@ -132,6 +136,41 @@ function refreshPhaseNotice() {
 function showAutosaveMessage(el, text, isError = false) {
   el.textContent = text;
   el.style.color = isError ? "#a62d2d" : "";
+}
+
+function initSectionCollapseControls() {
+  const groupsCollapsed = localStorage.getItem(GROUPS_COLLAPSED_KEY) === "1";
+  const knockoutCollapsed = localStorage.getItem(KNOCKOUT_COLLAPSED_KEY) === "1";
+
+  if (groupsStageDetails) {
+    groupsStageDetails.open = !groupsCollapsed;
+    groupsStageDetails.addEventListener("toggle", () => {
+      localStorage.setItem(GROUPS_COLLAPSED_KEY, groupsStageDetails.open ? "0" : "1");
+    });
+  }
+
+  if (knockoutStageDetails) {
+    knockoutStageDetails.open = !knockoutCollapsed;
+    knockoutStageDetails.addEventListener("toggle", () => {
+      localStorage.setItem(KNOCKOUT_COLLAPSED_KEY, knockoutStageDetails.open ? "0" : "1");
+    });
+  }
+}
+
+function setStageDetailsOpen(detailsEl, open) {
+  if (!detailsEl) return;
+  detailsEl.open = open;
+}
+
+function syncStageDetailsVisibility() {
+  const groupsVisible = groupsSection.style.display !== "none";
+  const knockoutVisible = knockoutSection.style.display !== "none";
+  if (groupsVisible) {
+    setStageDetailsOpen(groupsStageDetails, localStorage.getItem(GROUPS_COLLAPSED_KEY) !== "1");
+  }
+  if (knockoutVisible) {
+    setStageDetailsOpen(knockoutStageDetails, localStorage.getItem(KNOCKOUT_COLLAPSED_KEY) !== "1");
+  }
 }
 
 function flashMessage(target, text, isError = false) {
@@ -589,6 +628,7 @@ function applyStageLayout(participant) {
   if (!finalStageEnabled) {
     setSectionReadOnly(knockoutSection, true);
     showAutosaveMessage(submitFinalMsg, "La fase final todavía no está habilitada.");
+    syncStageDetailsVisibility();
     return;
   }
 
@@ -598,6 +638,7 @@ function applyStageLayout(participant) {
     showAutosaveMessage(submitFinalMsg, "Cambios con guardado automático.");
   }
 
+  syncStageDetailsVisibility();
   refreshPhaseNotice();
 }
 
@@ -713,4 +754,5 @@ refreshDataBtn?.addEventListener("click", async () => {
   }
 });
 
+initSectionCollapseControls();
 void load();

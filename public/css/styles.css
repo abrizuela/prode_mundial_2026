@@ -525,6 +525,21 @@ button:disabled {
   min-height: 1.2em;
 }
 
+.stage-details > summary {
+  cursor: pointer;
+  font-size: 1.2rem;
+  font-weight: 700;
+  color: var(--ink);
+}
+
+.stage-details > summary strong {
+  font-weight: inherit;
+}
+
+.stage-details > summary + * {
+  margin-top: 10px;
+}
+
 .submit-inline {
   margin-top: 30px;
   margin-bottom: 30px;

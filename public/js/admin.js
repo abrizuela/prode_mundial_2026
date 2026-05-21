@@ -464,7 +464,7 @@ function renderGlobalGroupSchedule(matches) {
     `)
     .join("");
 
-  wireDtCells(globalScheduleWrap, (input, v) => saveGroupKickoff(input.dataset.globalKickoff, v));
+  wireDtCells(globalScheduleWrap, (input, v, inlineFlash) => saveGroupKickoff(input.dataset.globalKickoff, v, inlineFlash));
 
   globalScheduleWrap.querySelectorAll("select[data-global-group-result]").forEach((select) => {
     select.addEventListener("change", async () => {
@@ -578,8 +578,8 @@ function renderGlobalKnockout(data) {
 
   globalBonusView.textContent = `Bonus real automatico: Campeón ${data.bonusFinal?.champion || "-"}, Subcampeón ${data.bonusFinal?.runnerUp || "-"}, Tercero ${data.bonusFinal?.third || "-"}, Cuarto ${data.bonusFinal?.fourth || "-"}.`;
 
-  wireDtCells(globalKnockoutEditor, (input, v) =>
-    saveKnockoutKickoff(input.dataset.roundKickoff, input.dataset.match, v)
+  wireDtCells(globalKnockoutEditor, (input, v, inlineFlash) =>
+    saveKnockoutKickoff(input.dataset.roundKickoff, input.dataset.match, v, inlineFlash)
   );
 
   globalKnockoutEditor.querySelectorAll("select[data-round]").forEach((select) => {
