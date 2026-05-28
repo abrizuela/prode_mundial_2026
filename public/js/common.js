@@ -62,6 +62,11 @@ const COUNTRY_CODE_BY_NAME = {
   ghana: "GH"
 };
 
+const SPECIAL_FLAG_EMOJI_BY_NAME = {
+  inglaterra: "\u{1F3F4}\u{E0067}\u{E0062}\u{E0065}\u{E006E}\u{E0067}\u{E007F}",
+  escocia: "\u{1F3F4}\u{E0067}\u{E0062}\u{E0073}\u{E0063}\u{E0074}\u{E007F}"
+};
+
 const KNOCKOUT_MATCH_START = {
   R16: 73,
   OCT: 89,
@@ -108,6 +113,8 @@ function codeToFlagEmoji(code) {
 export function countryFlag(countryName) {
   const normalized = normalizeCountryName(countryName);
   if (!normalized || normalized.startsWith("por definir")) return "";
+  const special = SPECIAL_FLAG_EMOJI_BY_NAME[normalized];
+  if (special) return special;
   const code = COUNTRY_CODE_BY_NAME[normalized];
   if (!code) return "";
   return codeToFlagEmoji(code);
