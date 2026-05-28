@@ -277,6 +277,71 @@ function openParticipantNotification(participantId) {
   customNotifTitleInput.focus();
 }
 
+function groupPendingSummary(participant, tournament) {
+  const matches = Array.isArray(tournament.groupMatches) ? tournament.groupMatches : [];
+  const predictions = participant?.predictions?.group ?? {};
+  let completed = 0;
+
+  for (const match of matches) {
+    if (predictions[match.id]) completed += 1;
+  }
+
+  return {
+    pending: Math.max(0, matches.length - completed),
+    completed,
+    total: matches.length
+  };
+}
+
+function finalPendingSummary(participant, tournament) {
+  const predictionsByRound = participant?.predictions?.knockout ?? {};
+  let total = 0;
+  let completed = 0;
+
+  for (const round of ROUND_ORDER) {
+    const matches = Array.isArray(tournament.knockoutMatches?.[round]) ? tournament.knockoutMatches[round] : [];
+    const predictions = predictionsByRound[round] ?? {};
+    total += matches.length;
+    for (const match of matches) {
+      if (predictions[match.id]) completed += 1;
+    }
+  }
+
+  return {
+    pending: Math.max(0, total - completed),
+    completed,
+    total
+  };
+}
+
+function bonusPendingSummary(participant) {
+  const bonus = participant?.predictions?.bonus ?? {};
+  const picks = [bonus.champion, bonus.runnerUp, bonus.third, bonus.fourth];
+  const total = 4;
+  let completed = 0;
+
+  for (const pick of picks) {
+    if (typeof pick === "string" && pick.trim()) completed += 1;
+  }
+
+  return {
+    pending: Math.max(0, total - completed),
+    completed,
+    total
+  };
+}
+
+function completedPercent({ completed, total }) {
+  if (!total) return 0;
+  return (completed / total) * 100;
+}
+
+function completionChipClass(percentage) {
+  if (percentage === 100) return "is-on";
+  if (percentage >= 50) return "is-pending";
+  return "is-off";
+}
+
 function renderParticipants(tournament) {
   if (!tournament.participants.length) {
     links.innerHTML = `
@@ -298,6 +363,15 @@ function renderParticipants(tournament) {
   const participantsHtml = tournament.participants
     .map((p) => {
       const url = `${window.location.origin}${p.playerUrl || p.groupUrl}`;
+      const groupSummary = groupPendingSummary(p, tournament);
+      const finalSummary = finalPendingSummary(p, tournament);
+      const bonusSummary = bonusPendingSummary(p);
+      const groupPercent = completedPercent(groupSummary);
+      const finalPercent = completedPercent(finalSummary);
+      const bonusPercent = completedPercent(bonusSummary);
+      const groupPendingClass = completionChipClass(groupPercent);
+      const finalPendingClass = completionChipClass(finalPercent);
+      const bonusPendingClass = completionChipClass(bonusPercent);
       const notifStatus = p.notificationsEnabled
         ? "<span class='status-chip is-on'>Notificaciones activas</span>"
         : "<span class='status-chip is-off'>Sin notificaciones</span>";
@@ -307,6 +381,9 @@ function renderParticipants(tournament) {
           <div class="row row-center-tight">
             <strong>${p.name}</strong>
             <button class="icon-btn" data-action="open-rename-participant" type="button" aria-label="Cambiar nombre del participante">✎</button>
+            <span class="status-chip ${groupPendingClass}">Grupos: ${groupPercent.toFixed(1)}% (${groupSummary.completed}/${groupSummary.total})</span>
+            <span class="status-chip ${finalPendingClass}">Final: ${finalPercent.toFixed(1)}% (${finalSummary.completed}/${finalSummary.total})</span>
+            <span class="status-chip ${bonusPendingClass}">Bonus: ${bonusPercent.toFixed(1)}% (${bonusSummary.completed}/${bonusSummary.total})</span>
             ${notifStatus}
           </div>
           <div class="row row-link">

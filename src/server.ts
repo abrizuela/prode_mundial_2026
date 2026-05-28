@@ -815,7 +815,8 @@ app.get("/api/tournaments/:id", requireAdmin, (req, res) => {
         token: p.token,
         predictions: {
           group: p.predictions.group,
-          knockout: p.predictions.knockout
+          knockout: p.predictions.knockout,
+          bonus: p.predictions.bonus
         },
         groupLockedAt: p.predictions.groupLockedAt,
         finalLockedAt: p.predictions.finalLockedAt,
