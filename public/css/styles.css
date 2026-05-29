@@ -10,6 +10,11 @@
   --ok: #2a9d8f;
 }
 
+html,
+body {
+  overflow-x: hidden;
+}
+
 * {
   box-sizing: border-box;
 }
@@ -398,7 +403,7 @@ button:disabled {
 
 .dt-text {
   font-size: 0.9rem;
-  min-width: 130px;
+  min-width: unset;
 }
 
 .result-cell {
@@ -442,13 +447,13 @@ button:disabled {
 }
 
 .admin-result-select {
-  width: 220px;
-  min-width: 220px;
-  max-width: 220px;
+  width: min(220px, 55vw);
+  min-width: unset;
+  max-width: min(220px, 55vw);
 }
 
 .admin-result-cell {
-  min-width: 220px;
+  min-width: unset;
   padding-bottom: 0;
 }
 
@@ -459,7 +464,7 @@ button:disabled {
 }
 
 .player-result-cell {
-  min-width: 220px;
+  min-width: unset;
   padding-bottom: 0;
 }
 
@@ -471,9 +476,9 @@ button:disabled {
 
 #groups .result-row select,
 #knockout .result-row select {
-  width: var(--player-result-select-width, 220px);
-  min-width: var(--player-result-select-width, 220px);
-  max-width: var(--player-result-select-width, 220px);
+  width: min(var(--player-result-select-width, 220px), 55vw);
+  min-width: unset;
+  max-width: min(var(--player-result-select-width, 220px), 55vw);
 }
 
 .outcome-mark {
