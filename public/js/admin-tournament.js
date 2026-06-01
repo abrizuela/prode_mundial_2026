@@ -385,7 +385,7 @@ function completedPercent({ completed, total }) {
 
 function completionChipClass(percentage) {
   if (percentage === 100) return "is-on";
-  if (percentage >= 50) return "is-pending";
+  if (percentage > 0) return "is-pending";
   return "is-off";
 }
 
