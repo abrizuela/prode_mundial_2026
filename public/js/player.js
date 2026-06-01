@@ -18,7 +18,7 @@ const title = document.querySelector("#title");
 const titleText = title?.querySelector("span");
 const subtitle = document.querySelector("#subtitle");
 const heroHint = document.querySelector("#heroHint");
-const phaseNotice = document.querySelector("#phaseNotice");
+const phaseProgress = document.querySelector("#phaseProgress");
 const leaderboardSection = document.querySelector("#leaderboardSection");
 const groupsWrap = document.querySelector("#groups");
 const knockoutWrap = document.querySelector("#knockout");
@@ -110,28 +110,41 @@ function hasKickoffStarted(kickoffAt) {
   return Date.now() >= kickoffTs;
 }
 
+function completionChipClass(percentage) {
+  if (percentage === 100) return "is-on";
+  if (percentage >= 50) return "is-pending";
+  return "is-off";
+}
+
+function completionPercent(completed, total) {
+  if (!total) return 0;
+  return (completed / total) * 100;
+}
+
 function refreshPhaseNotice() {
-  if (!phaseNotice) return;
-  const finalStageEnabled = Boolean(state?.tournament?.finalStageEnabled);
+  if (!phaseProgress) return;
 
-  const groupPending = [...groupsWrap.querySelectorAll("select[data-group-match]")]
-    .filter((select) => !select.disabled && !select.value)
-    .length;
-  const finalPending = finalStageEnabled
-    ? [...knockoutWrap.querySelectorAll("select[data-round]")]
-      .filter((select) => !select.disabled && !select.value)
-      .length
-    : 0;
+  const groupSelects = [...groupsWrap.querySelectorAll("select[data-group-match]")];
+  const finalSelects = [...knockoutWrap.querySelectorAll("select[data-round]")];
+  const bonusSelects = [bonusChampion, bonusRunnerUp, bonusThird, bonusFourth].filter(Boolean);
 
-  const parts = [];
-  if (groupPending > 0) {
-    parts.push(`Fase de grupos incompleta: faltan ${groupPending} resultado(s).`);
-  }
-  if (finalStageEnabled && finalPending > 0) {
-    parts.push(`Fase final incompleta: faltan ${finalPending} resultado(s).`);
-  }
+  const groupTotal = groupSelects.length;
+  const finalTotal = finalSelects.length;
+  const bonusTotal = bonusSelects.length;
 
-  phaseNotice.textContent = parts.join(" ");
+  const groupCompleted = groupSelects.filter((select) => Boolean(select.value)).length;
+  const finalCompleted = finalSelects.filter((select) => Boolean(select.value)).length;
+  const bonusCompleted = bonusSelects.filter((select) => Boolean(select.value)).length;
+
+  const groupPercent = completionPercent(groupCompleted, groupTotal);
+  const finalPercent = completionPercent(finalCompleted, finalTotal);
+  const bonusPercent = completionPercent(bonusCompleted, bonusTotal);
+
+  phaseProgress.innerHTML = `
+    <span class="status-chip ${completionChipClass(groupPercent)}">Grupos: ${groupPercent.toFixed(1)}% (${groupCompleted}/${groupTotal})</span>
+    <span class="status-chip ${completionChipClass(finalPercent)}">Final: ${finalPercent.toFixed(1)}% (${finalCompleted}/${finalTotal})</span>
+    <span class="status-chip ${completionChipClass(bonusPercent)}">Bonus: ${bonusPercent.toFixed(1)}% (${bonusCompleted}/${bonusTotal})</span>
+  `;
 }
 
 function showAutosaveMessage(el, text, isError = false) {
@@ -682,7 +695,7 @@ async function load() {
     if (titleText) titleText.textContent = playerPageTitle;
     else title.textContent = playerPageTitle;
     document.title = playerPageTitle;
-    subtitle.textContent = `Hola ${data.participant.name}. Los cambios se guardan automáticamente.`;
+    subtitle.textContent = `Hola ${data.participant.name}.`;
 
     currentKnockout = {
       R16: { ...(data.participant.predictions.knockout.R16 || {}) },

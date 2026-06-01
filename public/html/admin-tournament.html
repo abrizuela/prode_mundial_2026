@@ -56,11 +56,17 @@
 
       <section class="card stack">
         <h2>Participantes</h2>
-        <div class="row">
-          <input id="newParticipantName" placeholder="Nombre del participante" />
-          <button id="addParticipant">Agregar participante</button>
-        </div>
+        <label>
+          Filtrar participante
+          <select id="participantFilter">
+            <option value="">Todos los participantes</option>
+          </select>
+        </label>
+        <p id="participantFilterMsg" class="muted"></p>
         <div id="links" class="stack link-list"></div>
+        <div class="row row-end">
+          <button id="addParticipant" type="button">Agregar participante</button>
+        </div>
       </section>
 
       <section id="notificationsPanel" class="card stack">
@@ -112,6 +118,17 @@
           <div class="row row-end">
             <button id="renameParticipantCancel" class="secondary" type="button">Cancelar</button>
             <button id="renameParticipantSave" type="button">Guardar nombre</button>
+          </div>
+        </div>
+      </div>
+
+      <div id="addParticipantModal" class="modal hidden" role="dialog" aria-modal="true" aria-labelledby="addParticipantTitle">
+        <div class="modal-card stack">
+          <h3 id="addParticipantTitle">Agregar participante</h3>
+          <input id="addParticipantInput" placeholder="Nombre del participante" />
+          <div class="row row-end">
+            <button id="addParticipantCancel" class="secondary" type="button">Cancelar</button>
+            <button id="addParticipantSave" type="button">Agregar</button>
           </div>
         </div>
       </div>

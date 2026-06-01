@@ -8,8 +8,9 @@ const leaderboardEl = document.querySelector("#leaderboard");
 
 const openRenameTournamentIconBtn = document.querySelector("#openRenameTournamentIcon");
 const deleteTournamentBtn = document.querySelector("#deleteTournament");
-const newParticipantNameInput = document.querySelector("#newParticipantName");
 const addParticipantBtn = document.querySelector("#addParticipant");
+const participantFilterInput = document.querySelector("#participantFilter");
+const participantFilterMsg = document.querySelector("#participantFilterMsg");
 
 const renameTournamentModal = document.querySelector("#renameTournamentModal");
 const renameTournamentInput = document.querySelector("#renameTournamentInput");
@@ -19,6 +20,10 @@ const renameParticipantModal = document.querySelector("#renameParticipantModal")
 const renameParticipantInput = document.querySelector("#renameParticipantInput");
 const renameParticipantCancel = document.querySelector("#renameParticipantCancel");
 const renameParticipantSave = document.querySelector("#renameParticipantSave");
+const addParticipantModal = document.querySelector("#addParticipantModal");
+const addParticipantInput = document.querySelector("#addParticipantInput");
+const addParticipantCancel = document.querySelector("#addParticipantCancel");
+const addParticipantSave = document.querySelector("#addParticipantSave");
 
 const adminKeyInput = document.querySelector("#adminKey");
 const saveAdminKeyBtn = document.querySelector("#saveAdminKey");
@@ -277,6 +282,48 @@ function openParticipantNotification(participantId) {
   customNotifTitleInput.focus();
 }
 
+function renderParticipantFilterOptions(tournament) {
+  if (!participantFilterInput) return;
+  const previousValue = participantFilterInput.value;
+  const sortedParticipants = [...tournament.participants].sort((a, b) =>
+    String(a.name || "").localeCompare(String(b.name || ""), "es", { sensitivity: "base" })
+  );
+  const options = ['<option value="">Todos los participantes</option>']
+    .concat(
+      sortedParticipants.map((participant) =>
+        `<option value="${participant.id}">${participant.name}</option>`
+      )
+    )
+    .join("");
+
+  participantFilterInput.innerHTML = options;
+  participantFilterInput.value = tournament.participants.some((participant) => participant.id === previousValue)
+    ? previousValue
+    : "";
+}
+
+function applyParticipantFilter() {
+  if (!participantFilterInput) return;
+
+  const selectedParticipantId = participantFilterInput.value;
+  const participantCards = [...links.querySelectorAll("[data-participant-id]")];
+  let visibleCount = 0;
+
+  for (const card of participantCards) {
+    const isVisible = !selectedParticipantId || card.dataset.participantId === selectedParticipantId;
+    card.style.display = isVisible ? "" : "none";
+    if (isVisible) visibleCount += 1;
+  }
+
+  if (!participantFilterMsg) return;
+  if (!participantCards.length || !selectedParticipantId) {
+    participantFilterMsg.textContent = "";
+    return;
+  }
+
+  participantFilterMsg.textContent = visibleCount ? "" : "No se encontraron participantes con ese filtro.";
+}
+
 function groupPendingSummary(participant, tournament) {
   const matches = Array.isArray(tournament.groupMatches) ? tournament.groupMatches : [];
   const predictions = participant?.predictions?.group ?? {};
@@ -343,6 +390,8 @@ function completionChipClass(percentage) {
 }
 
 function renderParticipants(tournament) {
+  renderParticipantFilterOptions(tournament);
+
   if (!tournament.participants.length) {
     links.innerHTML = `
       <div class="group-box stack">
@@ -357,6 +406,7 @@ function renderParticipants(tournament) {
     links.querySelectorAll(".copy-btn").forEach((btn) => {
       btn.addEventListener("click", () => copyToClipboard(btn.dataset.copy, btn));
     });
+    if (participantFilterMsg) participantFilterMsg.textContent = "";
     return;
   }
 
@@ -461,6 +511,8 @@ function renderParticipants(tournament) {
   links.querySelectorAll(".copy-btn").forEach((btn) => {
     btn.addEventListener("click", () => copyToClipboard(btn.dataset.copy, btn));
   });
+
+  applyParticipantFilter();
 }
 
 function renderLeaderboard(leaderboard) {
@@ -563,6 +615,33 @@ renameParticipantSave.addEventListener("click", async () => {
   await load();
 });
 
+addParticipantBtn.addEventListener("click", () => {
+  if (!addParticipantModal || !addParticipantInput) return;
+  addParticipantInput.value = "";
+  addParticipantModal.classList.remove("hidden");
+  addParticipantInput.focus();
+});
+
+addParticipantCancel?.addEventListener("click", () => {
+  addParticipantModal?.classList.add("hidden");
+});
+
+addParticipantSave?.addEventListener("click", async () => {
+  const name = addParticipantInput?.value.trim() ?? "";
+  if (!name) return;
+
+  const res = await fetch(`/api/tournaments/${tournamentId}/participants`, {
+    method: "POST",
+    headers: adminHeaders({ "Content-Type": "application/json" }),
+    body: JSON.stringify({ name })
+  });
+
+  if (!res.ok) return;
+  if (addParticipantInput) addParticipantInput.value = "";
+  addParticipantModal?.classList.add("hidden");
+  await load();
+});
+
 deleteTournamentBtn.addEventListener("click", async () => {
   const confirmed = await openModal({
     title: "Eliminar torneo",
@@ -580,20 +659,7 @@ deleteTournamentBtn.addEventListener("click", async () => {
   window.location.href = "/admin";
 });
 
-addParticipantBtn.addEventListener("click", async () => {
-  const name = newParticipantNameInput.value.trim();
-  if (!name) return;
-
-  const res = await fetch(`/api/tournaments/${tournamentId}/participants`, {
-    method: "POST",
-    headers: adminHeaders({ "Content-Type": "application/json" }),
-    body: JSON.stringify({ name })
-  });
-
-  if (!res.ok) return;
-  newParticipantNameInput.value = "";
-  await load();
-});
+participantFilterInput?.addEventListener("change", applyParticipantFilter);
 
 saveAdminKeyBtn.addEventListener("click", async () => {
   const key = adminKeyInput.value.trim();
