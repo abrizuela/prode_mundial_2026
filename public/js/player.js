@@ -367,10 +367,33 @@ function getGroupOutcomeMark(matchId, predicted) {
     : '<span class="outcome-mark outcome-miss" aria-label="No acertado">✕</span>';
 }
 
-function getKnockoutOutcomeMark(round, matchId, predicted) {
-  const actual = state?.tournament?.actual?.knockout?.[round]?.[matchId];
-  if (!actual || !predicted) return "";
-  return actual === predicted
+function getMatchIndex(matchId) {
+  const index = Number(matchId.split("-")[1]);
+  return Number.isFinite(index) && index > 0 ? index - 1 : null;
+}
+
+function getKnockoutWinner(teamsByRound, round, matchId, result) {
+  if (!teamsByRound || !result) return null;
+
+  const matchIndex = getMatchIndex(matchId);
+  if (matchIndex === null) return null;
+
+  const match = teamsByRound[round]?.[matchIndex];
+  if (!match) return null;
+
+  return result === KNOCKOUT_RESULT.HOME ? match.home : match.away;
+}
+
+function getKnockoutOutcomeMark(round, matchId, predicted, actualTeams, predictedTeams) {
+  const actualResult = state?.tournament?.actual?.knockout?.[round]?.[matchId];
+  if (!actualResult || !predicted) return "";
+
+  const actualWinner = getKnockoutWinner(actualTeams, round, matchId, actualResult);
+  const predictedWinner = getKnockoutWinner(predictedTeams, round, matchId, predicted);
+
+  if (!actualWinner || !predictedWinner) return "";
+
+  return actualWinner === predictedWinner
     ? '<span class="outcome-mark outcome-hit" aria-label="Acertado">✓</span>'
     : '<span class="outcome-mark outcome-miss" aria-label="No acertado">✕</span>';
 }
@@ -465,6 +488,7 @@ function renderGroups(tournament, predictions, options = {}) {
 
 function renderKnockout(tournament, openRounds) {
   const teams = computeRoundTeams(tournament.knockoutMatches.R16, currentKnockout);
+  const actualTeams = computeRoundTeams(tournament.knockoutMatches.R16, state?.tournament?.actual?.knockout ?? {});
   const keptOpenRounds = openRounds ?? new Set(
     [...knockoutWrap.querySelectorAll("details[data-round][open]")].map((el) => el.dataset.round)
   );
@@ -487,7 +511,7 @@ function renderKnockout(tournament, openRounds) {
               <select data-round="${round}" data-match="${matchId}" ${hasKickoffStarted(kickoff) ? "disabled" : ""}>
                 ${renderKnockoutResultOptions(t.home, t.away, currentKnockout[round][matchId])}
               </select>
-              ${getKnockoutOutcomeMark(round, matchId, currentKnockout[round][matchId])}
+              ${getKnockoutOutcomeMark(round, matchId, currentKnockout[round][matchId], actualTeams, teams)}
             </div>
             <span class="save-flash" data-final-round="${round}" data-final-save-flash="${matchId}"></span>
           </div>
