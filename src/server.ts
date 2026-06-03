@@ -2,6 +2,7 @@ import path from "node:path";
 import express from "express";
 import { nanoid } from "nanoid";
 import webpush from "web-push";
+import { buildCountryCanonicalByNormalized, canonicalizeCountryName } from "./country-normalization.ts";
 import { buildInitialGroupMatches, buildInitialKnockoutMatches, listCompetingTeams } from "./fixtures.ts";
 import { buildLeaderboard, computeRoundTeams, deriveBonusFinal } from "./scoring.ts";
 import { findTournamentByParticipantToken, readStore, writeStore } from "./store.ts";
@@ -963,6 +964,8 @@ app.get("/api/p/:token", (req, res) => {
   const participantIndex = found.participantIndex;
   const participant = tournament.participants[participantIndex];
   const myRoundTeams = computeRoundTeams(tournament.knockoutMatches.R16, participant.predictions.knockout);
+  const allTeams = [...new Set(tournament.groupMatches.flatMap((m) => [m.home, m.away]))];
+  const countryCanonicalByNormalized = buildCountryCanonicalByNormalized(allTeams);
 
   res.json({
     tournament: {
@@ -981,7 +984,8 @@ app.get("/api/p/:token", (req, res) => {
       roundTeams: myRoundTeams,
       ...participantLinks(participant.token)
     },
-    leaderboard: buildLeaderboard(tournament)
+    leaderboard: buildLeaderboard(tournament),
+    countryCanonicalByNormalized
   });
 });
 
@@ -1044,6 +1048,8 @@ app.post("/api/p/:token/submit-group", (req, res) => {
 
   const participant = tournament.participants[participantIndex];
   const projectedTournament = withGlobalTournamentData(store, tournament);
+  const allTeams = [...new Set(projectedTournament.groupMatches.flatMap((m) => [m.home, m.away]))];
+  const countryCanonicalByNormalized = buildCountryCanonicalByNormalized(allTeams);
 
   const groupInput = req.body?.group ?? {};
   const bonusInput = req.body?.bonus ?? {};
@@ -1064,10 +1070,10 @@ app.post("/api/p/:token/submit-group", (req, res) => {
   const firstGroupKickoffStarted = projectedTournament.groupMatches.some((m) => hasKickoffStarted(m.kickoffAt));
   if (!firstGroupKickoffStarted) {
     participant.predictions.bonus = {
-      champion: typeof bonusInput.champion === "string" ? bonusInput.champion.trim() : "",
-      runnerUp: typeof bonusInput.runnerUp === "string" ? bonusInput.runnerUp.trim() : "",
-      third: typeof bonusInput.third === "string" ? bonusInput.third.trim() : "",
-      fourth: typeof bonusInput.fourth === "string" ? bonusInput.fourth.trim() : ""
+      champion: typeof bonusInput.champion === "string" ? canonicalizeCountryName(bonusInput.champion, countryCanonicalByNormalized) : "",
+      runnerUp: typeof bonusInput.runnerUp === "string" ? canonicalizeCountryName(bonusInput.runnerUp, countryCanonicalByNormalized) : "",
+      third: typeof bonusInput.third === "string" ? canonicalizeCountryName(bonusInput.third, countryCanonicalByNormalized) : "",
+      fourth: typeof bonusInput.fourth === "string" ? canonicalizeCountryName(bonusInput.fourth, countryCanonicalByNormalized) : ""
     };
   }
 

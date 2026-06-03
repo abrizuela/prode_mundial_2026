@@ -32,11 +32,32 @@
 
       <section class="card stack" id="bonusSection">
         <h2>Bonus</h2>
+        <p class="instance-subtitle"><span class="status-chip is-info">Campeón +8 | Subcampeón +6 | Tercero +4 | Cuarto +2</span></p>
         <div class="grid-2">
-          <label>Campeón<select id="bonusChampion"></select></label>
-          <label>Subcampeón<select id="bonusRunnerUp"></select></label>
-          <label>Tercero<select id="bonusThird"></select></label>
-          <label>Cuarto<select id="bonusFourth"></select></label>
+          <label>Campeón
+            <div class="result-row">
+              <select id="bonusChampion"></select>
+              <span id="bonusChampionOutcome"></span>
+            </div>
+          </label>
+          <label>Subcampeón
+            <div class="result-row">
+              <select id="bonusRunnerUp"></select>
+              <span id="bonusRunnerUpOutcome"></span>
+            </div>
+          </label>
+          <label>Tercero
+            <div class="result-row">
+              <select id="bonusThird"></select>
+              <span id="bonusThirdOutcome"></span>
+            </div>
+          </label>
+          <label>Cuarto
+            <div class="result-row">
+              <select id="bonusFourth"></select>
+              <span id="bonusFourthOutcome"></span>
+            </div>
+          </label>
         </div>
       </section>
 
@@ -44,6 +65,7 @@
         <details id="groupsStageDetails" class="stage-details" open>
           <summary><strong>Fase de grupos</strong></summary>
           <div id="groupsSectionBody" class="stack">
+            <p class="instance-subtitle"><span class="status-chip is-info">+1 por acierto</span></p>
             <div id="groups" class="stack"></div>
             <div class="stack submit-inline">
               <p id="submitGroupMsg" class="notice"></p>

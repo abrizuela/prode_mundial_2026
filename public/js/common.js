@@ -92,7 +92,7 @@ function loserPlaceholder(round, index) {
   return n ? `PERDEDOR Partido ${n}` : `PERDEDOR ${round}-${index + 1}`;
 }
 
-function normalizeCountryName(name) {
+export function normalizeCountryName(name) {
   return (name ?? "")
     .normalize("NFD")
     .replace(/[\u0300-\u036f]/g, "")

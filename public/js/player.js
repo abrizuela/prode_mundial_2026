@@ -1,4 +1,4 @@
-import { GROUP_RESULT, KNOCKOUT_RESULT, ROUND_ORDER, byGroup, computeRoundTeams, countryLabel, leaderboardTable, roundCount } from "./common.js";
+import { GROUP_RESULT, KNOCKOUT_RESULT, ROUND_ORDER, byGroup, computeRoundTeams, countryLabel, leaderboardTable, normalizeCountryName, roundCount } from "./common.js";
 
 function formatDate(isoOrNull) {
   if (!isoOrNull) return "";
@@ -34,6 +34,10 @@ const bonusChampion = document.querySelector("#bonusChampion");
 const bonusRunnerUp = document.querySelector("#bonusRunnerUp");
 const bonusThird = document.querySelector("#bonusThird");
 const bonusFourth = document.querySelector("#bonusFourth");
+const bonusChampionOutcome = document.querySelector("#bonusChampionOutcome");
+const bonusRunnerUpOutcome = document.querySelector("#bonusRunnerUpOutcome");
+const bonusThirdOutcome = document.querySelector("#bonusThirdOutcome");
+const bonusFourthOutcome = document.querySelector("#bonusFourthOutcome");
 
 const bonusSection = document.querySelector("#bonusSection");
 const groupsSection = document.querySelector("#groupsSection");
@@ -55,6 +59,7 @@ let isLoading = false;
 const flashTimers = new WeakMap();
 const NOTIF_ENABLED_KEY = `prode_push_enabled_${token}`;
 const NOTIF_MODAL_SEEN_KEY = `prode_push_modal_seen_${token}`;
+let countryCanonicalByNormalized = {};
 let currentKnockout = {
   R16: {},
   OCT: {},
@@ -77,6 +82,15 @@ const ROUND_LABELS = {
   SF: "Semifinales",
   THIRD: "Tercer puesto",
   FINAL: "Final"
+};
+
+const ROUND_POINTS = {
+  R16: 1,
+  OCT: 2,
+  QF: 4,
+  SF: 8,
+  THIRD: 16,
+  FINAL: 24
 };
 
 function getEditDeadline(matches) {
@@ -393,9 +407,60 @@ function getKnockoutOutcomeMark(round, matchId, predicted, actualTeams, predicte
 
   if (!actualWinner || !predictedWinner) return "";
 
-  return actualWinner === predictedWinner
+  return resolveCanonicalCountry(actualWinner) === resolveCanonicalCountry(predictedWinner)
     ? '<span class="outcome-mark outcome-hit" aria-label="Acertado">✓</span>'
     : '<span class="outcome-mark outcome-miss" aria-label="No acertado">✕</span>';
+}
+
+function resolveCanonicalCountry(value) {
+  const raw = String(value ?? "").trim();
+  if (!raw) return "";
+  const normalized = normalizeCountryName(raw);
+  return countryCanonicalByNormalized[normalized] || raw;
+}
+
+function resolveSelectValue(selectEl, rawValue) {
+  const value = resolveCanonicalCountry(rawValue);
+  if (!value) return "";
+
+  if ([...selectEl.options].some((option) => option.value === value)) {
+    return value;
+  }
+
+  const normalized = normalizeCountryName(value);
+  const match = [...selectEl.options].find((option) => normalizeCountryName(option.value) === normalized);
+  return match ? match.value : "";
+}
+
+function getBonusOutcomeMark(predicted, actual) {
+  if (!predicted || !actual) return "";
+  return resolveCanonicalCountry(predicted) === resolveCanonicalCountry(actual)
+    ? '<span class="outcome-mark outcome-hit" aria-label="Acertado">✓</span>'
+    : '<span class="outcome-mark outcome-miss" aria-label="No acertado">✕</span>';
+}
+
+function refreshBonusOutcomeMarks() {
+  const actual = state?.tournament?.actual?.bonusFinal;
+  if (!actual) {
+    if (bonusChampionOutcome) bonusChampionOutcome.innerHTML = "";
+    if (bonusRunnerUpOutcome) bonusRunnerUpOutcome.innerHTML = "";
+    if (bonusThirdOutcome) bonusThirdOutcome.innerHTML = "";
+    if (bonusFourthOutcome) bonusFourthOutcome.innerHTML = "";
+    return;
+  }
+
+  if (bonusChampionOutcome) {
+    bonusChampionOutcome.innerHTML = getBonusOutcomeMark(bonusChampion.value, actual.champion);
+  }
+  if (bonusRunnerUpOutcome) {
+    bonusRunnerUpOutcome.innerHTML = getBonusOutcomeMark(bonusRunnerUp.value, actual.runnerUp);
+  }
+  if (bonusThirdOutcome) {
+    bonusThirdOutcome.innerHTML = getBonusOutcomeMark(bonusThird.value, actual.third);
+  }
+  if (bonusFourthOutcome) {
+    bonusFourthOutcome.innerHTML = getBonusOutcomeMark(bonusFourth.value, actual.fourth);
+  }
 }
 
 function renderGroupResultOptions(match, selectedValue) {
@@ -520,11 +585,13 @@ function renderKnockout(tournament, openRounds) {
     });
 
     const roundLabel = ROUND_LABELS[round] ?? round;
+    const roundPoints = ROUND_POINTS[round] ?? 0;
 
     return `
       <details class="group-box" data-round="${round}" ${keptOpenRounds.has(round) ? "open" : ""}>
         <summary><strong>${roundLabel}</strong></summary>
         <div class="stack" style="margin-top:8px;">
+          <p class="instance-subtitle"><span class="status-chip is-info">+${roundPoints} por acierto</span></p>
           ${lines.join("")}
         </div>
       </details>
@@ -714,6 +781,7 @@ async function load() {
     }
 
     state = data;
+    countryCanonicalByNormalized = data.countryCanonicalByNormalized || {};
 
     const playerPageTitle = `PRODE Mundial 2026: ${data.tournament.name}`;
     if (titleText) titleText.textContent = playerPageTitle;
@@ -741,10 +809,11 @@ async function load() {
       sel.innerHTML = bonusOptions;
     }
 
-    bonusChampion.value = data.participant.predictions.bonus.champion || "";
-    bonusRunnerUp.value = data.participant.predictions.bonus.runnerUp || "";
-    bonusThird.value = data.participant.predictions.bonus.third || "";
-    bonusFourth.value = data.participant.predictions.bonus.fourth || "";
+    bonusChampion.value = resolveSelectValue(bonusChampion, data.participant.predictions.bonus.champion);
+    bonusRunnerUp.value = resolveSelectValue(bonusRunnerUp, data.participant.predictions.bonus.runnerUp);
+    bonusThird.value = resolveSelectValue(bonusThird, data.participant.predictions.bonus.third);
+    bonusFourth.value = resolveSelectValue(bonusFourth, data.participant.predictions.bonus.fourth);
+    refreshBonusOutcomeMarks();
 
     const groupClosedByTime = isPast(getEditDeadline(data.tournament.groupMatches || []));
     renderGroups(data.tournament, data.participant.predictions, { collapsed: groupClosedByTime });
@@ -762,6 +831,8 @@ async function load() {
 [bonusChampion, bonusRunnerUp, bonusThird, bonusFourth].forEach((el) => {
   el.addEventListener("change", () => {
     scheduleGroupAutosave();
+    refreshBonusOutcomeMarks();
+    refreshPhaseNotice();
   });
 });
 

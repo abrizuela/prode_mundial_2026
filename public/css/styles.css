@@ -301,6 +301,16 @@ button:disabled {
   border-color: #f0d6a4;
 }
 
+.status-chip.is-info {
+  color: #0b4f8a;
+  background: #e4f1ff;
+  border-color: #b9d8f8;
+}
+
+.instance-subtitle {
+  margin: 2px 0 0;
+}
+
 .notice {
   color: var(--ok);
   font-weight: 700;
@@ -441,6 +451,21 @@ button:disabled {
   width: 60px;
 }
 
+#bonusSection label {
+  display: grid;
+  gap: 6px;
+}
+
+#bonusSection .result-row select {
+  width: min(320px, 100%);
+  min-width: 220px;
+  max-width: 100%;
+}
+
+#bonusSection .result-row span {
+  min-width: 24px;
+}
+
 .admin-result-select {
   width: min(220px, 40vw);
   min-width: unset;
@@ -492,6 +517,11 @@ button:disabled {
     width: min(var(--player-result-select-width, 220px), 35vw);
     max-width: min(var(--player-result-select-width, 220px), 35vw);
     font-size: 0.85rem;
+  }
+
+  #bonusSection .result-row select {
+    width: 100%;
+    min-width: 0;
   }
 }
 

@@ -1,4 +1,5 @@
 import { KnockoutResultCode, ROUND_ORDER, ROUND_POINTS } from "./types.ts";
+import { normalizeCountryName } from "./country-normalization.ts";
 import type { KnockoutResult, RoundKey, Tournament } from "./types.ts";
 
 type RoundTeams = Record<RoundKey, { home: string; away: string }[]>;
@@ -217,10 +218,6 @@ function computeKnockoutPoints(tournament: Tournament, participantIndex: number)
   };
 }
 
-function normalizeTeamName(name: string) {
-  return name.trim().toLowerCase();
-}
-
 export function deriveBonusFinal(tournament: Tournament) {
   const teams = computeRoundTeams(tournament.knockoutMatches.R16, tournament.actual.knockout);
   const finalMatch = teams.FINAL[0] ?? { home: "", away: "" };
@@ -243,10 +240,10 @@ function computeBonusPoints(tournament: Tournament, participantIndex: number) {
   const mine = participant.predictions.bonus;
 
   let points = 0;
-  if (normalizeTeamName(mine.champion) && normalizeTeamName(mine.champion) === normalizeTeamName(real.champion)) points += 8;
-  if (normalizeTeamName(mine.runnerUp) && normalizeTeamName(mine.runnerUp) === normalizeTeamName(real.runnerUp)) points += 6;
-  if (normalizeTeamName(mine.third) && normalizeTeamName(mine.third) === normalizeTeamName(real.third)) points += 4;
-  if (normalizeTeamName(mine.fourth) && normalizeTeamName(mine.fourth) === normalizeTeamName(real.fourth)) points += 2;
+  if (normalizeCountryName(mine.champion) && normalizeCountryName(mine.champion) === normalizeCountryName(real.champion)) points += 8;
+  if (normalizeCountryName(mine.runnerUp) && normalizeCountryName(mine.runnerUp) === normalizeCountryName(real.runnerUp)) points += 6;
+  if (normalizeCountryName(mine.third) && normalizeCountryName(mine.third) === normalizeCountryName(real.third)) points += 4;
+  if (normalizeCountryName(mine.fourth) && normalizeCountryName(mine.fourth) === normalizeCountryName(real.fourth)) points += 2;
   return points;
 }
 
