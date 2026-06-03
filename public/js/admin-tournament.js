@@ -394,18 +394,8 @@ function renderParticipants(tournament) {
 
   if (!tournament.participants.length) {
     links.innerHTML = `
-      <div class="group-box stack">
-        <strong>Link público del torneo</strong>
-        <div class="row row-link">
-          <a href="/t/${tournament.id}" target="_blank" rel="noreferrer">${window.location.origin}/t/${tournament.id}</a>
-          <button class="icon-btn copy-btn" data-copy="${window.location.origin}/t/${tournament.id}" aria-label="Copiar link"><img src="/assets/copy.png" alt="" width="14" height="14" /></button>
-        </div>
-      </div>
       <p class="muted">No hay participantes en este torneo.</p>
     `;
-    links.querySelectorAll(".copy-btn").forEach((btn) => {
-      btn.addEventListener("click", () => copyToClipboard(btn.dataset.copy, btn));
-    });
     if (participantFilterMsg) participantFilterMsg.textContent = "";
     return;
   }
@@ -450,16 +440,7 @@ function renderParticipants(tournament) {
     })
     .join("");
 
-  links.innerHTML = `
-    <div class="group-box stack">
-      <strong>Link público del torneo</strong>
-      <div class="row row-link">
-        <a href="/t/${tournament.id}" target="_blank" rel="noreferrer">${window.location.origin}/t/${tournament.id}</a>
-        <button class="icon-btn copy-btn" data-copy="${window.location.origin}/t/${tournament.id}" aria-label="Copiar link"><img src="/assets/copy.png" alt="" width="14" height="14" /></button>
-      </div>
-    </div>
-    ${participantsHtml}
-  `;
+  links.innerHTML = participantsHtml;
 
   links.querySelectorAll("button[data-action='open-rename-participant']").forEach((btn) => {
     btn.addEventListener("click", () => {
