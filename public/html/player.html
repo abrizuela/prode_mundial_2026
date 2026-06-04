@@ -14,7 +14,10 @@
     <main class="container stack">
       <section class="card hero">
         <h1 id="title" class="brand-title"><img src="/assets/2026_FIFA_World_Cup_badge.png" alt="Logo PRODE Mundial 2026" /> <span>PRODE Mundial 2026</span></h1>
-        <p id="subtitle">Cargando...</p>
+        <div class="row row-center-tight">
+          <p id="subtitle">Cargando...</p>
+          <button id="openRenamePlayerIcon" class="icon-btn" type="button" aria-label="Cambiar tu nombre">✎</button>
+        </div>
         <p id="heroHint" class="muted">Los cambios se guardan automáticamente.</p>
         <p class="muted">Avance de carga de pronósticos por fase:</p>
         <div id="phaseProgress" class="row row-center-tight"></div>
@@ -103,6 +106,18 @@
           <div class="row" style="justify-content:flex-end;">
             <button id="modalCancel" class="secondary">Cancelar</button>
             <button id="modalOk">Aceptar</button>
+          </div>
+        </div>
+      </div>
+
+      <div id="renamePlayerModal" class="modal hidden" role="dialog" aria-modal="true" aria-labelledby="renamePlayerTitle">
+        <div class="modal-card stack">
+          <h3 id="renamePlayerTitle">Cambiar tu nombre</h3>
+          <input id="renamePlayerInput" placeholder="Tu nombre" maxlength="60" />
+          <p id="renamePlayerMsg" class="notice"></p>
+          <div class="row row-end">
+            <button id="renamePlayerCancel" class="secondary" type="button">Cancelar</button>
+            <button id="renamePlayerSave" type="button">Guardar nombre</button>
           </div>
         </div>
       </div>

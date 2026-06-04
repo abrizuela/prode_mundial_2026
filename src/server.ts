@@ -59,8 +59,20 @@ function emptyKnockoutPredictions() {
 function normalizeParticipantNames(input: unknown): string[] {
   if (!Array.isArray(input)) return [];
   return input
-    .map((v) => (typeof v === "string" ? v.trim() : ""))
+    .map((v) => (typeof v === "string" ? v.trim().replace(/\s+/g, " ") : ""))
     .filter((v) => v.length > 0);
+}
+
+function normalizeParticipantName(value: string) {
+  return value.trim().replace(/\s+/g, " ").toLocaleLowerCase("es");
+}
+
+function hasParticipantNameConflict(tournament: Tournament, name: string, excludedParticipantId = "") {
+  const normalizedName = normalizeParticipantName(name);
+  return tournament.participants.some((participant) => {
+    if (excludedParticipantId && participant.id === excludedParticipantId) return false;
+    return normalizeParticipantName(participant.name) === normalizedName;
+  });
 }
 
 function participantLinks(token: string) {
@@ -609,6 +621,16 @@ app.post("/api/tournaments", requireAdmin, (req, res) => {
     return;
   }
 
+  const seenParticipantNames = new Set<string>();
+  for (const participantName of participants) {
+    const normalized = normalizeParticipantName(participantName);
+    if (seenParticipantNames.has(normalized)) {
+      res.status(409).json({ error: "Hay nombres de participantes duplicados" });
+      return;
+    }
+    seenParticipantNames.add(normalized);
+  }
+
   const store = readStore();
   const tournamentId = nanoid(10);
   const tournament: Tournament = {
@@ -696,9 +718,14 @@ app.post("/api/tournaments/:id/participants", requireAdmin, (req, res) => {
     return;
   }
 
-  const name = typeof req.body?.name === "string" ? req.body.name.trim() : "";
+  const name = typeof req.body?.name === "string" ? req.body.name.trim().replace(/\s+/g, " ") : "";
   if (!name) {
     res.status(400).json({ error: "Nombre de participante inválido" });
+    return;
+  }
+
+  if (hasParticipantNameConflict(tournament, name)) {
+    res.status(409).json({ error: "Ya existe un participante con ese nombre" });
     return;
   }
 
@@ -741,9 +768,14 @@ app.patch("/api/tournaments/:id/participants/:participantId", requireAdmin, (req
     return;
   }
 
-  const name = typeof req.body?.name === "string" ? req.body.name.trim() : "";
+  const name = typeof req.body?.name === "string" ? req.body.name.trim().replace(/\s+/g, " ") : "";
   if (!name) {
     res.status(400).json({ error: "Nombre de participante inválido" });
+    return;
+  }
+
+  if (hasParticipantNameConflict(tournament, name, participant.id)) {
+    res.status(409).json({ error: "Ya existe un participante con ese nombre" });
     return;
   }
 
@@ -987,6 +1019,43 @@ app.get("/api/p/:token", (req, res) => {
     leaderboard: buildLeaderboard(tournament),
     countryCanonicalByNormalized
   });
+});
+
+app.patch("/api/p/:token/profile", (req, res) => {
+  const store = readStore();
+
+  let tournament: Tournament | undefined;
+  let participantIndex = -1;
+
+  for (const t of store.tournaments) {
+    const idx = t.participants.findIndex((p) => p.token === req.params.token);
+    if (idx >= 0) {
+      tournament = t;
+      participantIndex = idx;
+      break;
+    }
+  }
+
+  if (!tournament || participantIndex < 0) {
+    res.status(404).json({ error: "Link inválido" });
+    return;
+  }
+
+  const name = typeof req.body?.name === "string" ? req.body.name.trim().replace(/\s+/g, " ") : "";
+  if (!name) {
+    res.status(400).json({ error: "Nombre inválido" });
+    return;
+  }
+
+  const participant = tournament.participants[participantIndex];
+  if (hasParticipantNameConflict(tournament, name, participant.id)) {
+    res.status(409).json({ error: "Ya existe un participante con ese nombre" });
+    return;
+  }
+
+  tournament.participants[participantIndex].name = name;
+  writeStore(store);
+  res.json({ ok: true });
 });
 
 app.post("/api/p/:token/push-subscription", (req, res) => {

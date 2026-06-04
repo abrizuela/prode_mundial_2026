@@ -20,10 +20,12 @@ const renameParticipantModal = document.querySelector("#renameParticipantModal")
 const renameParticipantInput = document.querySelector("#renameParticipantInput");
 const renameParticipantCancel = document.querySelector("#renameParticipantCancel");
 const renameParticipantSave = document.querySelector("#renameParticipantSave");
+const renameParticipantMsg = document.querySelector("#renameParticipantMsg");
 const addParticipantModal = document.querySelector("#addParticipantModal");
 const addParticipantInput = document.querySelector("#addParticipantInput");
 const addParticipantCancel = document.querySelector("#addParticipantCancel");
 const addParticipantSave = document.querySelector("#addParticipantSave");
+const addParticipantMsg = document.querySelector("#addParticipantMsg");
 
 const adminKeyInput = document.querySelector("#adminKey");
 const saveAdminKeyBtn = document.querySelector("#saveAdminKey");
@@ -451,6 +453,7 @@ function renderParticipants(tournament) {
 
       currentParticipantId = participantId;
       renameParticipantInput.value = participantName;
+      setNotice(renameParticipantMsg, "");
       renameParticipantModal.classList.remove("hidden");
       renameParticipantInput.focus();
     });
@@ -576,13 +579,17 @@ renameTournamentSave.addEventListener("click", async () => {
 });
 
 renameParticipantCancel.addEventListener("click", () => {
+  setNotice(renameParticipantMsg, "");
   renameParticipantModal.classList.add("hidden");
   currentParticipantId = "";
 });
 
 renameParticipantSave.addEventListener("click", async () => {
   const name = renameParticipantInput.value.trim();
-  if (!currentParticipantId || !name) return;
+  if (!currentParticipantId || !name) {
+    setNotice(renameParticipantMsg, "Nombre de participante inválido", true);
+    return;
+  }
 
   const res = await fetch(`/api/tournaments/${tournamentId}/participants/${currentParticipantId}`, {
     method: "PATCH",
@@ -590,7 +597,12 @@ renameParticipantSave.addEventListener("click", async () => {
     body: JSON.stringify({ name })
   });
 
-  if (!res.ok) return;
+  if (!res.ok) {
+    const data = await res.json().catch(() => ({}));
+    setNotice(renameParticipantMsg, data.error ?? "Revisá el nombre e intentá de nuevo.", true);
+    return;
+  }
+  setNotice(renameParticipantMsg, "");
   renameParticipantModal.classList.add("hidden");
   currentParticipantId = "";
   await load();
@@ -599,17 +611,22 @@ renameParticipantSave.addEventListener("click", async () => {
 addParticipantBtn.addEventListener("click", () => {
   if (!addParticipantModal || !addParticipantInput) return;
   addParticipantInput.value = "";
+  setNotice(addParticipantMsg, "");
   addParticipantModal.classList.remove("hidden");
   addParticipantInput.focus();
 });
 
 addParticipantCancel?.addEventListener("click", () => {
+  setNotice(addParticipantMsg, "");
   addParticipantModal?.classList.add("hidden");
 });
 
 addParticipantSave?.addEventListener("click", async () => {
   const name = addParticipantInput?.value.trim() ?? "";
-  if (!name) return;
+  if (!name) {
+    setNotice(addParticipantMsg, "Nombre de participante inválido", true);
+    return;
+  }
 
   const res = await fetch(`/api/tournaments/${tournamentId}/participants`, {
     method: "POST",
@@ -617,7 +634,12 @@ addParticipantSave?.addEventListener("click", async () => {
     body: JSON.stringify({ name })
   });
 
-  if (!res.ok) return;
+  if (!res.ok) {
+    const data = await res.json().catch(() => ({}));
+    setNotice(addParticipantMsg, data.error ?? "Revisá el nombre e intentá de nuevo.", true);
+    return;
+  }
+  setNotice(addParticipantMsg, "");
   if (addParticipantInput) addParticipantInput.value = "";
   addParticipantModal?.classList.add("hidden");
   await load();

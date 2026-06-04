@@ -17,6 +17,7 @@ const token = parts[1] ?? "";
 const title = document.querySelector("#title");
 const titleText = title?.querySelector("span");
 const subtitle = document.querySelector("#subtitle");
+const openRenamePlayerIconBtn = document.querySelector("#openRenamePlayerIcon");
 const heroHint = document.querySelector("#heroHint");
 const phaseProgress = document.querySelector("#phaseProgress");
 const leaderboardSection = document.querySelector("#leaderboardSection");
@@ -53,6 +54,11 @@ const modalTitle = document.querySelector("#modalTitle");
 const modalText = document.querySelector("#modalText");
 const modalCancel = document.querySelector("#modalCancel");
 const modalOk = document.querySelector("#modalOk");
+const renamePlayerModal = document.querySelector("#renamePlayerModal");
+const renamePlayerInput = document.querySelector("#renamePlayerInput");
+const renamePlayerCancel = document.querySelector("#renamePlayerCancel");
+const renamePlayerSave = document.querySelector("#renamePlayerSave");
+const renamePlayerMsg = document.querySelector("#renamePlayerMsg");
 
 let state = null;
 let isLoading = false;
@@ -74,6 +80,7 @@ const touchedGroupMatches = new Set();
 const touchedFinalMatches = new Set();
 const GROUPS_COLLAPSED_KEY = "prode_player_groups_collapsed";
 const KNOCKOUT_COLLAPSED_KEY = "prode_player_knockout_collapsed";
+let currentPlayerName = "";
 
 const ROUND_LABELS = {
   R16: "16vos de final",
@@ -199,6 +206,14 @@ function syncStageDetailsVisibility() {
   if (knockoutVisible) {
     setStageDetailsOpen(knockoutStageDetails, localStorage.getItem(KNOCKOUT_COLLAPSED_KEY) !== "1");
   }
+}
+
+function openRenamePlayerModal() {
+  if (!renamePlayerInput || !renamePlayerModal) return;
+  renamePlayerInput.value = currentPlayerName;
+  showAutosaveMessage(renamePlayerMsg, "");
+  renamePlayerModal.classList.remove("hidden");
+  renamePlayerInput.focus();
 }
 
 function flashMessage(target, text, isError = false) {
@@ -788,6 +803,7 @@ async function load() {
     else title.textContent = playerPageTitle;
     document.title = playerPageTitle;
     subtitle.textContent = `Hola ${data.participant.name}.`;
+    currentPlayerName = data.participant.name || "";
 
     currentKnockout = {
       R16: { ...(data.participant.predictions.knockout.R16 || {}) },
@@ -842,6 +858,36 @@ enableKickoffNotifBtn.addEventListener("click", async () => {
 
 disableKickoffNotifBtn.addEventListener("click", async () => {
   await unregisterPushSubscription();
+});
+
+openRenamePlayerIconBtn?.addEventListener("click", openRenamePlayerModal);
+
+renamePlayerCancel?.addEventListener("click", () => {
+  showAutosaveMessage(renamePlayerMsg, "");
+  renamePlayerModal?.classList.add("hidden");
+});
+
+renamePlayerSave?.addEventListener("click", async () => {
+  const name = renamePlayerInput?.value.trim() || "";
+  if (!name) {
+    showAutosaveMessage(renamePlayerMsg, "Nombre inválido", true);
+    return;
+  }
+
+  const res = await fetch(`/api/p/${token}/profile`, {
+    method: "PATCH",
+    headers: { "Content-Type": "application/json" },
+    body: JSON.stringify({ name })
+  });
+
+  if (!res.ok) {
+    const data = await res.json().catch(() => ({}));
+    showAutosaveMessage(renamePlayerMsg, data.error ?? "Revisá el nombre e intentá de nuevo.", true);
+    return;
+  }
+  showAutosaveMessage(renamePlayerMsg, "");
+  renamePlayerModal?.classList.add("hidden");
+  await load();
 });
 
 initSectionCollapseControls();
