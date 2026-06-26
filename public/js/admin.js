@@ -119,6 +119,13 @@ function toDatetimeLocalValue(isoOrNull) {
   return local.toISOString().slice(0, 16);
 }
 
+function localDatetimeToIso(localDatetimeOrNull) {
+  if (!localDatetimeOrNull) return "";
+  const parsed = new Date(localDatetimeOrNull);
+  if (Number.isNaN(parsed.getTime())) return "";
+  return parsed.toISOString();
+}
+
 function formatKickoffDisplay(isoOrNull) {
   const v = toDatetimeLocalValue(isoOrNull);
   if (!v) return "Sin fecha";
@@ -222,10 +229,11 @@ function wireDtCells(container, onSave) {
 }
 
 async function saveGroupKickoff(matchId, value, inlineFlash) {
+  const kickoffAtIso = localDatetimeToIso(value || "");
   const res = await fetch("/api/admin/group-schedule", {
     method: "PATCH",
     headers: adminHeaders({ "Content-Type": "application/json" }),
-    body: JSON.stringify({ kickoffAt: { [matchId]: value || "" }, results: {} })
+    body: JSON.stringify({ kickoffAt: { [matchId]: kickoffAtIso || "" }, results: {} })
   });
   if (!res.ok) {
     if (inlineFlash) flashMessage(inlineFlash, "Error al guardar", true);
@@ -263,10 +271,11 @@ async function saveKnockoutResults(round, results) {
 }
 
 async function saveKnockoutKickoff(round, matchId, value, inlineFlash) {
+  const kickoffAtIso = localDatetimeToIso(value || "");
   const res = await fetch("/api/admin/knockout/kickoff", {
     method: "PATCH",
     headers: adminHeaders({ "Content-Type": "application/json" }),
-    body: JSON.stringify({ round, kickoffAt: { [matchId]: value || "" } })
+    body: JSON.stringify({ round, kickoffAt: { [matchId]: kickoffAtIso || "" } })
   });
   if (!res.ok) {
     if (inlineFlash) flashMessage(inlineFlash, "Error al guardar", true);
@@ -668,7 +677,7 @@ saveGlobalR16Btn.addEventListener("click", async () => {
       id: homeInput.dataset.r16Home,
       home: homeInput.value,
       away: awayInput.value,
-      kickoffAt: kickoffInput.value || ""
+      kickoffAt: localDatetimeToIso(kickoffInput.value || "") || ""
     };
   });
 
