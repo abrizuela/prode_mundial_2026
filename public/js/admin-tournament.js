@@ -199,13 +199,19 @@ function renderWhatsAppPanel(tournament) {
   }
 
   const now = Date.now();
+  const currentMatch = matches.find((m) => {
+    if (!m.kickoffAt) return false;
+    const ts = new Date(m.kickoffAt).getTime();
+    if (!Number.isFinite(ts)) return false;
+    return now >= ts && now <= (ts + 120 * 60 * 1000);
+  });
   const nextUpcoming = matches.find((m) => {
     if (!m.kickoffAt) return false;
     const ts = new Date(m.kickoffAt).getTime();
     return Number.isFinite(ts) && ts >= now;
   });
 
-  whatsappMatchSelect.value = nextUpcoming?.key || matches[0].key;
+  whatsappMatchSelect.value = currentMatch?.key || nextUpcoming?.key || matches[0].key;
   refreshWhatsAppPreview();
 }
 
