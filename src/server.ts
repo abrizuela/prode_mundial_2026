@@ -67,6 +67,31 @@ function normalizeParticipantName(value: string) {
   return value.trim().replace(/\s+/g, " ").toLocaleLowerCase("es");
 }
 
+function normalizeTournamentName(value: string) {
+  return value.trim().replace(/\s+/g, " ");
+}
+
+function tournamentPublicSlug(name: string) {
+  const plain = normalizeTournamentName(name)
+    .normalize("NFD")
+    .replace(/[\u0300-\u036f]/g, "")
+    .toLocaleLowerCase("es");
+
+  const slug = plain
+    .replace(/[^a-z0-9]+/g, "-")
+    .replace(/^-+|-+$/g, "");
+
+  return slug || "torneo";
+}
+
+function hasTournamentSlugConflict(store: Store, tournamentName: string, excludedTournamentId = "") {
+  const nextSlug = tournamentPublicSlug(tournamentName);
+  return store.tournaments.some((t) => {
+    if (excludedTournamentId && t.id === excludedTournamentId) return false;
+    return tournamentPublicSlug(t.name) === nextSlug;
+  });
+}
+
 function hasParticipantNameConflict(tournament: Tournament, name: string, excludedParticipantId = "") {
   const normalizedName = normalizeParticipantName(name);
   return tournament.participants.some((participant) => {
@@ -91,6 +116,19 @@ function getTournamentOr404(res: express.Response, tournamentId: string): Tourna
     return null;
   }
   return tournament;
+}
+
+function getTournamentByPublicSlugOr404(res: express.Response, slugOrId: string): Tournament | null {
+  const store = readStore();
+  const slug = String(slugOrId || "").trim().toLocaleLowerCase("es");
+  const bySlug = store.tournaments.find((t) => tournamentPublicSlug(t.name) === slug);
+  if (bySlug) return bySlug;
+
+  const byId = store.tournaments.find((t) => t.id === slugOrId);
+  if (byId) return byId;
+
+  res.status(404).json({ error: "Torneo no encontrado" });
+  return null;
 }
 
 function withGlobalTournamentData(store: Store, tournament: Tournament): Tournament {
@@ -215,6 +253,83 @@ function hasKickoffLockStarted(kickoffAt: string | null | undefined, lockMinutes
   const kickoffTs = new Date(kickoffAt).getTime();
   if (!Number.isFinite(kickoffTs)) return false;
   return Date.now() >= (kickoffTs - lockMinutesBeforeKickoff * 60 * 1000);
+}
+
+function buildPublicWhatsAppSummaries(tournament: Tournament) {
+  const lockMinutesBeforeKickoff = getTournamentLockMinutes(tournament);
+  const roundLabels: Record<RoundKey, string> = {
+    R16: "16vos de final",
+    OCT: "8vos de final",
+    QF: "Cuartos de final",
+    SF: "Semifinales",
+    THIRD: "Tercer puesto",
+    FINAL: "Final"
+  };
+
+  const groupMatches = tournament.groupMatches.map((m) => ({
+    key: `group|${m.id}`,
+    stageLabel: `Grupo ${m.group}`,
+    type: "group" as const,
+    matchId: m.id,
+    home: m.home,
+    away: m.away,
+    kickoffAt: m.kickoffAt
+  }));
+
+  const knockoutMatches = ROUND_ORDER.flatMap((round) =>
+    tournament.knockoutMatches[round].map((m) => ({
+      key: `knockout|${round}|${m.id}`,
+      stageLabel: roundLabels[round] || round,
+      type: "knockout" as const,
+      round,
+      matchId: m.id,
+      home: m.home,
+      away: m.away,
+      kickoffAt: m.kickoffAt
+    }))
+  );
+
+  const all = [...groupMatches, ...knockoutMatches]
+    .filter((m) => hasKickoffLockStarted(m.kickoffAt, lockMinutesBeforeKickoff))
+    .sort((a, b) => {
+      const ta = a.kickoffAt ? new Date(a.kickoffAt).getTime() : Number.POSITIVE_INFINITY;
+      const tb = b.kickoffAt ? new Date(b.kickoffAt).getTime() : Number.POSITIVE_INFINITY;
+      return ta - tb;
+    });
+
+  return all.map((match) => {
+    const local: string[] = [];
+    const draw: string[] = [];
+    const away: string[] = [];
+
+    for (const participant of tournament.participants) {
+      if (match.type === "group") {
+        const value = participant.predictions.group[match.matchId];
+        if (value === "L") local.push(participant.name);
+        if (value === "E") draw.push(participant.name);
+        if (value === "V") away.push(participant.name);
+        continue;
+      }
+
+      const value = participant.predictions.knockout[match.round][match.matchId];
+      if (value === "L") local.push(participant.name);
+      if (value === "V") away.push(participant.name);
+    }
+
+    return {
+      key: match.key,
+      stageLabel: match.stageLabel,
+      type: match.type,
+      matchId: match.matchId,
+      round: match.type === "knockout" ? match.round : undefined,
+      home: match.home,
+      away: match.away,
+      kickoffAt: match.kickoffAt,
+      localNames: local,
+      drawNames: draw,
+      awayNames: away
+    };
+  });
 }
 
 app.get("/", (_req, res) => {
@@ -622,6 +737,7 @@ app.get("/api/tournaments", requireAdmin, (_req, res) => {
   const tournaments = store.tournaments.map((t) => ({
     id: t.id,
     name: t.name,
+    publicSlug: tournamentPublicSlug(t.name),
     createdAt: t.createdAt,
     participants: t.participants.length
   }));
@@ -629,7 +745,7 @@ app.get("/api/tournaments", requireAdmin, (_req, res) => {
 });
 
 app.post("/api/tournaments", requireAdmin, (req, res) => {
-  const name = typeof req.body?.name === "string" ? req.body.name.trim() : "";
+  const name = typeof req.body?.name === "string" ? normalizeTournamentName(req.body.name) : "";
   const participants = normalizeParticipantNames(req.body?.participants);
 
   if (!name) {
@@ -648,6 +764,10 @@ app.post("/api/tournaments", requireAdmin, (req, res) => {
   }
 
   const store = readStore();
+  if (hasTournamentSlugConflict(store, name)) {
+    res.status(409).json({ error: "Ya existe un torneo con ese nombre" });
+    return;
+  }
   const tournamentId = nanoid(10);
   const tournament: Tournament = {
     id: tournamentId,
@@ -696,9 +816,14 @@ app.patch("/api/tournaments/:id", requireAdmin, (req, res) => {
     return;
   }
 
-  const name = typeof req.body?.name === "string" ? req.body.name.trim() : "";
+  const name = typeof req.body?.name === "string" ? normalizeTournamentName(req.body.name) : "";
   if (!name) {
     res.status(400).json({ error: "Nombre inválido" });
+    return;
+  }
+
+  if (hasTournamentSlugConflict(store, name, tournament.id)) {
+    res.status(409).json({ error: "Ya existe un torneo con ese nombre" });
     return;
   }
 
@@ -1005,8 +1130,8 @@ app.get("/api/tournaments/:id/leaderboard", (req, res) => {
   res.json({ leaderboard: buildLeaderboard(tournament) });
 });
 
-app.get("/api/public/tournaments/:id", (req, res) => {
-  const found = getTournamentOr404(res, req.params.id);
+app.get("/api/public/tournaments/:slug", (req, res) => {
+  const found = getTournamentByPublicSlugOr404(res, req.params.slug);
   if (!found) return;
 
   const store = readStore();
@@ -1015,10 +1140,13 @@ app.get("/api/public/tournaments/:id", (req, res) => {
     tournament: {
       id: tournament.id,
       name: tournament.name,
+      publicSlug: tournamentPublicSlug(tournament.name),
       createdAt: tournament.createdAt,
-      participantCount: tournament.participants.length
+      participantCount: tournament.participants.length,
+      lockMinutesBeforeKickoff: getTournamentLockMinutes(tournament)
     },
-    leaderboard: buildLeaderboard(tournament)
+    leaderboard: buildLeaderboard(tournament),
+    whatsappSummaries: buildPublicWhatsAppSummaries(tournament)
   });
 });
 

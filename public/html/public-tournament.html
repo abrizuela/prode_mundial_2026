@@ -24,6 +24,23 @@
         </div>
         <div id="leaderboard"></div>
       </section>
+
+      <section class="card stack">
+        <h2>Resumen para WhatsApp</h2>
+        <p class="muted">Solo se muestran partidos cuya edición ya está cerrada.</p>
+        <label>
+          Partido
+          <select id="whatsappMatchSelect"></select>
+        </label>
+        <label>
+          Mensaje
+          <textarea id="whatsappPreview" class="whatsapp-preview" rows="8" readonly></textarea>
+        </label>
+        <div class="row">
+          <button id="copyWhatsappBtn" type="button">Copiar texto</button>
+        </div>
+        <p id="whatsappMsg" class="notice"></p>
+      </section>
     </main>
 
     <script type="module" src="/js/public-tournament.js"></script>

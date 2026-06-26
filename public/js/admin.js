@@ -381,7 +381,7 @@ function renderTournaments(tournaments) {
         </div>
         <div class="row">
           <a href="/admin/${t.id}" class="btn-primary">Abrir panel</a>
-          <a href="/t/${t.id}" class="btn-primary" target="_blank" rel="noreferrer">Ver link público</a>
+          <a href="/t/${encodeURIComponent(t.publicSlug || t.name)}" class="btn-primary" target="_blank" rel="noreferrer">Ver link público</a>
         </div>
       </div>
     `)
