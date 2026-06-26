@@ -2,7 +2,7 @@ import path from "node:path";
 import express from "express";
 import { nanoid } from "nanoid";
 import webpush from "web-push";
-import { buildCountryCanonicalByNormalized, canonicalizeCountryName } from "./country-normalization.ts";
+import { buildCountryCanonicalByNormalized, canonicalizeCountryName, normalizeCountryName } from "./country-normalization.ts";
 import { buildInitialGroupMatches, buildInitialKnockoutMatches, listCompetingTeams } from "./fixtures.ts";
 import { buildLeaderboard, computeRoundTeams, deriveBonusFinal } from "./scoring.ts";
 import { findTournamentByParticipantToken, readStore, writeStore } from "./store.ts";
@@ -69,6 +69,82 @@ function normalizeParticipantName(value: string) {
 
 function normalizeTournamentName(value: string) {
   return value.trim().replace(/\s+/g, " ");
+}
+
+const COUNTRY_CODE_BY_NAME: Record<string, string> = {
+  mexico: "MX",
+  "corea del sur": "KR",
+  sudafrica: "ZA",
+  "republica checa": "CZ",
+  canada: "CA",
+  suiza: "CH",
+  qatar: "QA",
+  "bosnia herzegovina": "BA",
+  brasil: "BR",
+  marruecos: "MA",
+  escocia: "GB",
+  haiti: "HT",
+  "estados unidos": "US",
+  australia: "AU",
+  paraguay: "PY",
+  turquia: "TR",
+  alemania: "DE",
+  ecuador: "EC",
+  "costa de marfil": "CI",
+  curazao: "CW",
+  "paises bajos": "NL",
+  japon: "JP",
+  tunez: "TN",
+  suecia: "SE",
+  belgica: "BE",
+  iran: "IR",
+  egipto: "EG",
+  "nueva zelanda": "NZ",
+  "cabo verde": "CV",
+  "arabia saudita": "SA",
+  espana: "ES",
+  uruguay: "UY",
+  francia: "FR",
+  senegal: "SN",
+  noruega: "NO",
+  irak: "IQ",
+  argelia: "DZ",
+  argentina: "AR",
+  austria: "AT",
+  jordania: "JO",
+  portugal: "PT",
+  colombia: "CO",
+  uzbekistan: "UZ",
+  "rd congo": "CD",
+  inglaterra: "GB",
+  croacia: "HR",
+  panama: "PA",
+  ghana: "GH"
+};
+
+const SPECIAL_FLAG_BY_NAME: Record<string, string> = {
+  inglaterra: "🏴",
+  escocia: "🏴"
+};
+
+function codeToFlagEmoji(code: string) {
+  const upper = code.toUpperCase();
+  if (!/^[A-Z]{2}$/.test(upper)) return "";
+  return String.fromCodePoint(...upper.split("").map((char) => 127397 + char.charCodeAt(0)));
+}
+
+function countryLabelWithFlag(countryName: string) {
+  const normalized = normalizeCountryName(countryName || "");
+  if (!normalized || normalized.startsWith("por definir")) return countryName;
+
+  const special = SPECIAL_FLAG_BY_NAME[normalized];
+  if (special) return `${special} ${countryName}`;
+
+  const code = COUNTRY_CODE_BY_NAME[normalized];
+  if (!code) return countryName;
+
+  const flag = codeToFlagEmoji(code);
+  return flag ? `${flag} ${countryName}` : countryName;
 }
 
 function tournamentPublicSlug(name: string) {
@@ -1524,7 +1600,7 @@ async function pushDueKickoffNotifications() {
 
           dueNotifications.push({
             key,
-            body: `${match.home} vs ${match.away}: se acaba de cerrar la edición (${tournament.name})`,
+            body: `${countryLabelWithFlag(match.home)} vs ${countryLabelWithFlag(match.away)}: se acaba de cerrar la edición (${tournament.name})`,
             url: `/p/${token}/group`
           });
         }
@@ -1543,7 +1619,7 @@ async function pushDueKickoffNotifications() {
 
             dueNotifications.push({
               key,
-              body: `${match.home} vs ${match.away} (${knockoutRoundLabels[round]}): se acaba de cerrar la edición (${tournament.name})`,
+              body: `${countryLabelWithFlag(match.home)} vs ${countryLabelWithFlag(match.away)} (${knockoutRoundLabels[round]}): se acaba de cerrar la edición (${tournament.name})`,
               url: `/p/${token}/final`
             });
           }
