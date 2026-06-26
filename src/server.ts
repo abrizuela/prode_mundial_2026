@@ -443,6 +443,7 @@ app.get("/api/admin/knockout", requireAdmin, (_req, res) => {
     id: "global",
     name: "global",
     createdAt: new Date(0).toISOString(),
+    lockMinutesBeforeKickoff: DEFAULT_LOCK_MINUTES_BEFORE_KICKOFF,
     participants: [],
     groupMatches: buildInitialGroupMatches(),
     knockoutMatches: {
@@ -1489,14 +1490,26 @@ async function pushDueKickoffNotifications() {
 
     for (const tournament of store.tournaments) {
       const withKickoff = withGlobalTournamentData(store, tournament);
+      const lockMinutesBeforeKickoff = getTournamentLockMinutes(withKickoff);
+      const knockoutRoundLabels: Record<RoundKey, string> = {
+        R16: "16vos de final",
+        OCT: "8vos de final",
+        QF: "Cuartos de final",
+        SF: "Semifinales",
+        THIRD: "Tercer puesto",
+        FINAL: "Final"
+      };
 
       for (const participant of withKickoff.participants) {
         const token = participant.token;
         const subscriptions = store.pushState.subscriptionsByToken[token] ?? [];
         if (!subscriptions.length) continue;
+        let activeSubs = [...subscriptions];
 
         const sent = new Set(store.pushState.sentByToken[token] ?? []);
         let sentChanged = false;
+
+        const dueNotifications: Array<{ key: string; body: string; url: string }> = [];
 
         for (const match of withKickoff.groupMatches) {
           if (!match.kickoffAt) continue;
@@ -1506,20 +1519,50 @@ async function pushDueKickoffNotifications() {
           const kickoffMs = new Date(match.kickoffAt).getTime();
           if (Number.isNaN(kickoffMs)) continue;
 
-          const diff = kickoffMs - now;
-          if (diff > 5 * 60 * 1000 || diff <= 0) continue;
+          const lockStartMs = kickoffMs - lockMinutesBeforeKickoff * 60 * 1000;
+          if (now < lockStartMs || now >= lockStartMs + PUSH_CHECK_INTERVAL_MS) continue;
 
-          const payload = JSON.stringify({
-            title: "PRODE Mundial 2026",
-            body: `${match.home} vs ${match.away} arranca en menos de 5 minutos (${tournament.name})`,
+          dueNotifications.push({
+            key,
+            body: `${match.home} vs ${match.away}: se acaba de cerrar la edición (${tournament.name})`,
             url: `/p/${token}/group`
           });
+        }
 
-          const aliveSubs: typeof subscriptions = [];
-          for (const sub of subscriptions) {
+        for (const round of ROUND_ORDER) {
+          for (const match of withKickoff.knockoutMatches[round]) {
+            if (!match.kickoffAt) continue;
+            const key = `${tournament.id}:${match.id}`;
+            if (sent.has(key)) continue;
+
+            const kickoffMs = new Date(match.kickoffAt).getTime();
+            if (Number.isNaN(kickoffMs)) continue;
+
+            const lockStartMs = kickoffMs - lockMinutesBeforeKickoff * 60 * 1000;
+            if (now < lockStartMs || now >= lockStartMs + PUSH_CHECK_INTERVAL_MS) continue;
+
+            dueNotifications.push({
+              key,
+              body: `${match.home} vs ${match.away} (${knockoutRoundLabels[round]}): se acaba de cerrar la edición (${tournament.name})`,
+              url: `/p/${token}/final`
+            });
+          }
+        }
+
+        for (const due of dueNotifications) {
+          const payload = JSON.stringify({
+            title: "PRODE Mundial 2026",
+            body: due.body,
+            url: due.url
+          });
+
+          let delivered = false;
+          const aliveSubs: typeof activeSubs = [];
+          for (const sub of activeSubs) {
             try {
               await webpush.sendNotification(sub, payload);
               aliveSubs.push(sub);
+              delivered = true;
             } catch (error: unknown) {
               const statusCode = isObject(error) && typeof error.statusCode === "number" ? error.statusCode : 0;
               if (statusCode !== 404 && statusCode !== 410) {
@@ -1528,10 +1571,14 @@ async function pushDueKickoffNotifications() {
             }
           }
 
-          store.pushState.subscriptionsByToken[token] = aliveSubs;
-          sent.add(key);
-          sentChanged = true;
-          changed = true;
+          activeSubs = aliveSubs;
+          store.pushState.subscriptionsByToken[token] = activeSubs;
+
+          if (delivered) {
+            sent.add(due.key);
+            sentChanged = true;
+            changed = true;
+          }
         }
 
         if (sentChanged) {
