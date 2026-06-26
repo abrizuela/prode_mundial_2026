@@ -220,9 +220,10 @@ function setNotice(el, text, isError = false) {
   el.style.color = isError ? "#a62d2d" : "";
 }
 
-function openModal({ title, text, confirmText = "Aceptar", cancelText = "Cancelar" }) {
+function openModal({ title, text, html = false, confirmText = "Aceptar", cancelText = "Cancelar" }) {
   modalTitle.textContent = title;
-  modalText.textContent = text;
+  if (html) modalText.innerHTML = text;
+  else modalText.textContent = text;
   modalOk.textContent = confirmText;
   modalCancel.textContent = cancelText;
   modal.classList.remove("hidden");
@@ -482,11 +483,13 @@ function renderParticipants(tournament) {
     btn.addEventListener("click", async () => {
       const card = btn.closest("[data-participant-id]");
       const participantId = card?.dataset.participantId;
+      const participantName = card?.querySelector("strong")?.textContent?.trim() || "este participante";
       if (!participantId) return;
 
       const confirmed = await openModal({
         title: "Eliminar participante",
-        text: "Se eliminará el participante y sus links. Esta acción no se puede deshacer.",
+        text: `Se eliminará <strong>${participantName}</strong> y sus links. Esta acción no se puede deshacer.`,
+        html: true,
         confirmText: "Eliminar"
       });
       if (!confirmed) return;
@@ -659,9 +662,11 @@ addParticipantSave?.addEventListener("click", async () => {
 });
 
 deleteTournamentBtn.addEventListener("click", async () => {
+  const tournamentName = currentTournamentName || "este torneo";
   const confirmed = await openModal({
     title: "Eliminar torneo",
-    text: "Se eliminará este torneo completo. Esta acción no se puede deshacer.",
+    text: `Se eliminará <strong>${tournamentName}</strong> completo. Esta acción no se puede deshacer.`,
+    html: true,
     confirmText: "Eliminar"
   });
   if (!confirmed) return;
