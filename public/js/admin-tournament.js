@@ -1,4 +1,4 @@
-import { GROUP_RESULT, KNOCKOUT_RESULT, ROUND_ORDER, countryFlag, countryLabel, leaderboardTable } from "./common.js";
+import { GROUP_RESULT, KNOCKOUT_RESULT, ROUND_ORDER, computeRoundTeams, countryFlag, countryLabel, leaderboardTable } from "./common.js";
 
 const tournamentId = window.location.pathname.split("/").pop();
 
@@ -94,8 +94,8 @@ function getWhatsAppMatches(tournament) {
       stageLabel: ROUND_LABELS[round] || round,
       round,
       matchId: m.id,
-      home: m.home,
-      away: m.away,
+      home: tournament.actualTeams?.[round]?.[Number(m.id.split("-")[1]) - 1]?.home ?? m.home,
+      away: tournament.actualTeams?.[round]?.[Number(m.id.split("-")[1]) - 1]?.away ?? m.away,
       kickoffAt: m.kickoffAt,
       type: "knockout"
     }))
@@ -124,6 +124,9 @@ function buildWhatsAppSummary(tournament, match) {
   const local = [];
   const draw = [];
   const away = [];
+  const skull = [];
+  const knockoutIndex = match.type === "knockout" ? Number(match.matchId.split("-")[1]) - 1 : -1;
+  const actualMatch = match.type === "knockout" ? tournament.actualTeams?.[match.round]?.[knockoutIndex] : null;
 
   for (const participant of tournament.participants) {
     if (match.type === "group") {
@@ -135,8 +138,20 @@ function buildWhatsAppSummary(tournament, match) {
     }
 
     const value = participant.predictions?.knockout?.[match.round]?.[match.matchId];
-    if (value === KNOCKOUT_RESULT.HOME) local.push(participant.name);
-    if (value === KNOCKOUT_RESULT.AWAY) away.push(participant.name);
+    const applySkull = match.round !== "R16";
+    const participantTeams = computeRoundTeams(tournament.knockoutMatches?.R16 || [], participant.predictions?.knockout || {});
+    const predictedMatch = participantTeams?.[match.round]?.[knockoutIndex];
+    const impossibleHome = applySkull && predictedMatch?.home !== actualMatch?.home;
+    const impossibleAway = applySkull && predictedMatch?.away !== actualMatch?.away;
+
+    if (value === KNOCKOUT_RESULT.HOME) {
+      if (impossibleHome) skull.push(participant.name);
+      else local.push(participant.name);
+    }
+    if (value === KNOCKOUT_RESULT.AWAY) {
+      if (impossibleAway) skull.push(participant.name);
+      else away.push(participant.name);
+    }
   }
 
   const lines = [
@@ -153,6 +168,9 @@ function buildWhatsAppSummary(tournament, match) {
   }
 
   lines.push(`${sideMarker(match.away)} ${formatNames(away)}`);
+  if (match.type === "knockout") {
+    lines.push(`☠️ ${formatNames(skull)}`);
+  }
 
   return lines.join("\n");
 }
@@ -219,6 +237,17 @@ function setNotice(el, text, isError = false) {
   el.textContent = text;
   el.style.color = isError ? "#a62d2d" : "";
 }
+
+function onBracketUpdated() {
+  void load();
+}
+
+window.addEventListener("prode-bracket-updated", onBracketUpdated);
+window.addEventListener("storage", (event) => {
+  if (event.key === "prode_bracket_update_at") {
+    onBracketUpdated();
+  }
+});
 
 function openModal({ title, text, html = false, confirmText = "Aceptar", cancelText = "Cancelar" }) {
   modalTitle.textContent = title;

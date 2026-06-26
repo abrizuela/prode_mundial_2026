@@ -16,6 +16,17 @@ const whatsappMsg = document.querySelector("#whatsappMsg");
 let currentSummaries = [];
 let currentTournamentName = "Torneo";
 
+function onBracketUpdated() {
+  void loadPublicTournament();
+}
+
+window.addEventListener("prode-bracket-updated", onBracketUpdated);
+window.addEventListener("storage", (event) => {
+  if (event.key === "prode_bracket_update_at") {
+    onBracketUpdated();
+  }
+});
+
 function formatDate(isoOrNull) {
   if (!isoOrNull) return "";
   const d = new Date(isoOrNull);
@@ -57,6 +68,9 @@ function buildWhatsAppSummary(tournamentName, match) {
   }
 
   lines.push(`${sideMarker(match.away)} ${formatNames(match.awayNames)}`);
+  if (match.type === "knockout") {
+    lines.push(`☠️ ${formatNames(match.skullNames)}`);
+  }
   return lines.join("\n");
 }
 

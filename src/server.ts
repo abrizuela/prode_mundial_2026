@@ -257,6 +257,7 @@ function hasKickoffLockStarted(kickoffAt: string | null | undefined, lockMinutes
 
 function buildPublicWhatsAppSummaries(tournament: Tournament) {
   const lockMinutesBeforeKickoff = getTournamentLockMinutes(tournament);
+  const actualTeams = computeRoundTeams(tournament.knockoutMatches.R16, tournament.actual.knockout);
   const roundLabels: Record<RoundKey, string> = {
     R16: "16vos de final",
     OCT: "8vos de final",
@@ -283,8 +284,8 @@ function buildPublicWhatsAppSummaries(tournament: Tournament) {
       type: "knockout" as const,
       round,
       matchId: m.id,
-      home: m.home,
-      away: m.away,
+      home: actualTeams[round]?.[Number(m.id.split("-")[1]) - 1]?.home ?? m.home,
+      away: actualTeams[round]?.[Number(m.id.split("-")[1]) - 1]?.away ?? m.away,
       kickoffAt: m.kickoffAt
     }))
   );
@@ -301,6 +302,8 @@ function buildPublicWhatsAppSummaries(tournament: Tournament) {
     const local: string[] = [];
     const draw: string[] = [];
     const away: string[] = [];
+    const knockoutIndex = match.type === "knockout" ? Number(match.matchId.split("-")[1]) - 1 : -1;
+    const skull: string[] = [];
 
     for (const participant of tournament.participants) {
       if (match.type === "group") {
@@ -312,8 +315,21 @@ function buildPublicWhatsAppSummaries(tournament: Tournament) {
       }
 
       const value = participant.predictions.knockout[match.round][match.matchId];
-      if (value === "L") local.push(participant.name);
-      if (value === "V") away.push(participant.name);
+      const participantTeams = computeRoundTeams(tournament.knockoutMatches.R16, participant.predictions.knockout);
+      const actualMatch = actualTeams[match.round][knockoutIndex];
+      const predictedMatch = participantTeams[match.round][knockoutIndex];
+      const applySkull = match.round !== "R16";
+      const participantHomeImpossible = applySkull && predictedMatch?.home !== actualMatch?.home;
+      const participantAwayImpossible = applySkull && predictedMatch?.away !== actualMatch?.away;
+
+      if (value === "L") {
+        if (participantHomeImpossible) skull.push(participant.name);
+        else local.push(participant.name);
+      }
+      if (value === "V") {
+        if (participantAwayImpossible) skull.push(participant.name);
+        else away.push(participant.name);
+      }
     }
 
     return {
@@ -327,7 +343,8 @@ function buildPublicWhatsAppSummaries(tournament: Tournament) {
       kickoffAt: match.kickoffAt,
       localNames: local,
       drawNames: draw,
-      awayNames: away
+      awayNames: away,
+      skullNames: skull
     };
   });
 }

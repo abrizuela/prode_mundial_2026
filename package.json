@@ -8,6 +8,8 @@
   },
   "scripts": {
     "dev": "node --watch --experimental-strip-types src/server.ts",
+    "kill:3000": "powershell -NoProfile -ExecutionPolicy Bypass -Command \"$ErrorActionPreference = 'SilentlyContinue'; $connections = Get-NetTCPConnection -LocalPort 3000 -State Listen; if ($connections) { $connections | ForEach-Object { Stop-Process -Id $_.OwningProcess -Force } }; exit 0\"",
+    "dev:clean": "npm run kill:3000 && npm run dev",
     "build": "node -e \"console.log('No build step required')\"",
     "start": "node --experimental-strip-types src/server.ts"
   },

@@ -47,6 +47,7 @@ const datetimeModalCancel = document.querySelector("#datetimeModalCancel");
 const datetimeModalSave = document.querySelector("#datetimeModalSave");
 
 const ADMIN_KEY_STORAGE = "prode_admin_key";
+const BRACKET_UPDATE_EVENT = "prode-bracket-updated";
 let knockoutState = null;
 const flashTimers = new Map();
 let tournamentsCache = [];
@@ -164,6 +165,11 @@ function flashMessage(target, text, isError = false) {
   flashTimers.set(target, timer);
 }
 
+function notifyBracketUpdated() {
+  localStorage.setItem("prode_bracket_update_at", String(Date.now()));
+  window.dispatchEvent(new Event(BRACKET_UPDATE_EVENT));
+}
+
 function openDatetimeModal({ title, value }) {
   datetimeModalTitle.textContent = title;
   datetimeModalInput.value = value || "";
@@ -242,6 +248,7 @@ async function saveGroupKickoff(matchId, value, inlineFlash) {
   }
   if (inlineFlash) flashMessage(inlineFlash, "Cambios guardados");
   else flashMessage(globalScheduleMsg, "Cambios guardados.");
+  notifyBracketUpdated();
 }
 
 async function saveGroupResults(results) {
@@ -254,6 +261,7 @@ async function saveGroupResults(results) {
     flashMessage(globalScheduleMsg, "Error al guardar resultado", true);
     return false;
   }
+  notifyBracketUpdated();
   return true;
 }
 
@@ -267,6 +275,7 @@ async function saveKnockoutResults(round, results) {
     flashMessage(globalKnockoutMsg, "Error al guardar resultado", true);
     return false;
   }
+  notifyBracketUpdated();
   return true;
 }
 
@@ -284,6 +293,7 @@ async function saveKnockoutKickoff(round, matchId, value, inlineFlash) {
   }
   if (inlineFlash) flashMessage(inlineFlash, "Cambios guardados");
   else flashMessage(globalKnockoutMsg, `Cambios guardados en ${roundLabel(round)}.`);
+  notifyBracketUpdated();
 }
 
 function byGroup(matches) {
@@ -703,6 +713,7 @@ saveGlobalR16Btn.addEventListener("click", async () => {
   }
 
   flashMessage(globalR16Msg, "16vos globales guardados.");
+  notifyBracketUpdated();
   await loadGlobalKnockout();
 });
 
