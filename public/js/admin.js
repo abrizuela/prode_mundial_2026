@@ -295,6 +295,15 @@ function byGroup(matches) {
   return map;
 }
 
+function groupTeamsLabel(rows) {
+  const teams = [...new Set((rows || []).flatMap((m) => [m.home, m.away]))]
+    .filter(Boolean)
+    .sort((a, b) => String(a).localeCompare(String(b), "es", { sensitivity: "base" }));
+
+  if (!teams.length) return "";
+  return teams.map((team) => countryLabel(team)).join(" · ");
+}
+
 function openModal({ title, text, confirmText = "Aceptar", cancelText = "Cancelar" }) {
   modalTitle.textContent = title;
   modalText.textContent = text;
@@ -444,7 +453,7 @@ function renderGlobalGroupSchedule(matches) {
   globalScheduleWrap.innerHTML = [...grouped.entries()]
     .map(([group, rows]) => `
       <details class="group-box">
-        <summary><strong>Grupo ${group}</strong></summary>
+        <summary><strong>Grupo ${group}</strong> <span class="muted">${groupTeamsLabel(rows)}</span></summary>
         <div class="stack" style="margin-top:8px;">
           ${rows
             .map((m) => `
