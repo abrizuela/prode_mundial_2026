@@ -1,7 +1,7 @@
 import fs from "node:fs";
 import path from "node:path";
 import { buildInitialGroupMatches, buildInitialKnockoutMatches } from "./fixtures.ts";
-import { ROUND_ORDER } from "./types.ts";
+import { DEFAULT_LOCK_MINUTES_BEFORE_KICKOFF, ROUND_ORDER } from "./types.ts";
 import type { GroupResult, KnockoutMatch, KnockoutResult, RoundKey, Store, Tournament } from "./types.ts";
 
 const STORE_PATH = path.join(process.cwd(), "data", "store.json");
@@ -132,6 +132,12 @@ function normalizeStore(raw: unknown): Store {
   };
 
   for (const tournament of tournaments) {
+    const lockMinutesRaw = (tournament as Partial<Tournament>).lockMinutesBeforeKickoff;
+    const lockMinutes = typeof lockMinutesRaw === "number" && Number.isFinite(lockMinutesRaw)
+      ? Math.max(0, Math.round(lockMinutesRaw))
+      : DEFAULT_LOCK_MINUTES_BEFORE_KICKOFF;
+    tournament.lockMinutesBeforeKickoff = lockMinutes;
+
     tournament.participants = (tournament.participants ?? []).map((participant) => {
       const legacyLockedAt = (participant.predictions as { lockedAt?: string | null }).lockedAt ?? null;
       const groupLockedAt = participant.predictions.groupLockedAt ?? legacyLockedAt;

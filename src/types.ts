@@ -71,6 +71,7 @@ export type Tournament = {
   id: string;
   name: string;
   createdAt: string;
+  lockMinutesBeforeKickoff: number;
   participants: Participant[];
   groupMatches: GroupMatch[];
   knockoutMatches: Record<RoundKey, KnockoutMatch[]>;
@@ -104,3 +105,5 @@ export const ROUND_POINTS: Record<RoundKey, number> = {
   THIRD: 16,
   FINAL: 24
 };
+
+export const DEFAULT_LOCK_MINUTES_BEFORE_KICKOFF = 5;

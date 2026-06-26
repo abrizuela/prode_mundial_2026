@@ -31,6 +31,9 @@ const adminKeyInput = document.querySelector("#adminKey");
 const saveAdminKeyBtn = document.querySelector("#saveAdminKey");
 const clearAdminKeyBtn = document.querySelector("#clearAdminKey");
 const adminAuthMsg = document.querySelector("#adminAuthMsg");
+const lockMinutesBeforeKickoffInput = document.querySelector("#lockMinutesBeforeKickoff");
+const saveLockMinutesBeforeKickoffBtn = document.querySelector("#saveLockMinutesBeforeKickoff");
+const lockMinutesMsg = document.querySelector("#lockMinutesMsg");
 const notificationsPanel = document.querySelector("#notificationsPanel");
 const customNotifRecipientSelect = document.querySelector("#customNotifRecipient");
 const customNotifTitleInput = document.querySelector("#customNotifTitle");
@@ -544,6 +547,10 @@ async function load() {
   title.textContent = tournament.name;
   currentTournamentName = tournament.name;
   currentTournament = tournament;
+  if (lockMinutesBeforeKickoffInput) {
+    const minutes = Number(tournament.lockMinutesBeforeKickoff);
+    lockMinutesBeforeKickoffInput.value = Number.isFinite(minutes) ? String(minutes) : "5";
+  }
 
   renderParticipants(tournament);
   renderLeaderboard(data.leaderboard);
@@ -673,6 +680,33 @@ saveAdminKeyBtn.addEventListener("click", async () => {
 clearAdminKeyBtn.addEventListener("click", async () => {
   localStorage.removeItem(ADMIN_KEY_STORAGE);
   adminKeyInput.value = "";
+  await load();
+});
+
+saveLockMinutesBeforeKickoffBtn?.addEventListener("click", async () => {
+  const value = Number(lockMinutesBeforeKickoffInput?.value ?? "");
+  if (!Number.isFinite(value) || value < 0) {
+    setNotice(lockMinutesMsg, "Ingresá un número válido de minutos (0 o más).", true);
+    return;
+  }
+
+  const minutes = Math.round(value);
+  const res = await fetch(`/api/tournaments/${tournamentId}/lock-window`, {
+    method: "PATCH",
+    headers: adminHeaders({ "Content-Type": "application/json" }),
+    body: JSON.stringify({ minutes })
+  });
+
+  const data = await res.json().catch(() => ({}));
+  if (!res.ok) {
+    setNotice(lockMinutesMsg, data.error ?? "No se pudo guardar la configuración.", true);
+    return;
+  }
+
+  if (lockMinutesBeforeKickoffInput) {
+    lockMinutesBeforeKickoffInput.value = String(minutes);
+  }
+  setNotice(lockMinutesMsg, `Configuración guardada: cierre ${minutes} minutos antes.`);
   await load();
 });
 

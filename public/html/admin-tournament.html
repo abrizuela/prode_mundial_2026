@@ -93,6 +93,16 @@
       </section>
 
       <section class="card stack">
+        <h2>Cierre de carga</h2>
+        <p class="muted">Definí cuántos minutos antes del inicio se bloquea la edición de pronósticos.</p>
+        <div class="row row-center-tight">
+          <input id="lockMinutesBeforeKickoff" type="number" min="0" step="1" placeholder="Minutos" />
+          <button id="saveLockMinutesBeforeKickoff" type="button">Guardar</button>
+        </div>
+        <p id="lockMinutesMsg" class="notice"></p>
+      </section>
+
+      <section class="card stack">
         <h2>Zona peligrosa</h2>
         <p class="muted">Eliminá el torneo completo y todos sus participantes.</p>
         <div class="row">

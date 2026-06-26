@@ -100,14 +100,14 @@ const ROUND_POINTS = {
   FINAL: 24
 };
 
-function getEditDeadline(matches) {
+function getEditDeadline(matches, lockMinutesBeforeKickoff = 5) {
   const kickoffTimes = matches
     .map((m) => (m?.kickoffAt ? new Date(m.kickoffAt).getTime() : Number.NaN))
     .filter((v) => Number.isFinite(v));
 
   if (!kickoffTimes.length) return null;
   const firstKickoff = Math.min(...kickoffTimes);
-  return new Date(firstKickoff - 60 * 60 * 1000);
+  return new Date(firstKickoff - lockMinutesBeforeKickoff * 60 * 1000);
 }
 
 function isPast(dateOrNull) {
@@ -128,7 +128,9 @@ function hasKickoffStarted(kickoffAt) {
   if (!kickoffAt) return false;
   const kickoffTs = new Date(kickoffAt).getTime();
   if (!Number.isFinite(kickoffTs)) return false;
-  return Date.now() >= kickoffTs;
+  const lockMinutes = Number(state?.tournament?.lockMinutesBeforeKickoff);
+  const minutesBeforeKickoff = Number.isFinite(lockMinutes) ? Math.max(0, Math.round(lockMinutes)) : 5;
+  return Date.now() >= (kickoffTs - minutesBeforeKickoff * 60 * 1000);
 }
 
 function completionChipClass(percentage) {
@@ -730,8 +732,13 @@ function applyStageLayout(participant) {
   groupsSection.style.display = "block";
   knockoutSection.style.display = "block";
 
-  const groupDeadline = getEditDeadline(state?.tournament?.groupMatches || []);
-  const finalDeadline = getEditDeadline(ROUND_ORDER.flatMap((round) => state?.tournament?.knockoutMatches?.[round] || []));
+  const lockMinutes = Number(state?.tournament?.lockMinutesBeforeKickoff);
+  const minutesBeforeKickoff = Number.isFinite(lockMinutes) ? Math.max(0, Math.round(lockMinutes)) : 5;
+  const groupDeadline = getEditDeadline(state?.tournament?.groupMatches || [], minutesBeforeKickoff);
+  const finalDeadline = getEditDeadline(
+    ROUND_ORDER.flatMap((round) => state?.tournament?.knockoutMatches?.[round] || []),
+    minutesBeforeKickoff
+  );
   const groupClosedByTime = isPast(groupDeadline);
   const finalClosedByTime = isPast(finalDeadline);
   const finalStageEnabled = Boolean(state?.tournament?.finalStageEnabled);
@@ -740,7 +747,7 @@ function applyStageLayout(participant) {
 
   if (groupClosedByTime) {
     setSectionReadOnly(bonusSection, true);
-    showAutosaveMessage(submitGroupMsg, "Los partidos iniciados no se pueden editar.");
+    showAutosaveMessage(submitGroupMsg, `Los partidos se bloquean ${minutesBeforeKickoff} minuto(s) antes del inicio.`);
   } else {
     showAutosaveMessage(submitGroupMsg, "Cambios con guardado automático.");
   }
@@ -753,7 +760,7 @@ function applyStageLayout(participant) {
   }
 
   if (finalClosedByTime) {
-    showAutosaveMessage(submitFinalMsg, "Los partidos iniciados no se pueden editar.");
+    showAutosaveMessage(submitFinalMsg, `Los partidos se bloquean ${minutesBeforeKickoff} minuto(s) antes del inicio.`);
   } else {
     showAutosaveMessage(submitFinalMsg, "Cambios con guardado automático.");
   }
@@ -831,7 +838,9 @@ async function load() {
     bonusFourth.value = resolveSelectValue(bonusFourth, data.participant.predictions.bonus.fourth);
     refreshBonusOutcomeMarks();
 
-    const groupClosedByTime = isPast(getEditDeadline(data.tournament.groupMatches || []));
+    const lockMinutes = Number(data.tournament?.lockMinutesBeforeKickoff);
+    const minutesBeforeKickoff = Number.isFinite(lockMinutes) ? Math.max(0, Math.round(lockMinutes)) : 5;
+    const groupClosedByTime = isPast(getEditDeadline(data.tournament.groupMatches || [], minutesBeforeKickoff));
     renderGroups(data.tournament, data.participant.predictions, { collapsed: groupClosedByTime });
     renderKnockout(data.tournament);
     leaderboardEl.innerHTML = leaderboardTable(data.leaderboard);

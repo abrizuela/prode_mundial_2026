@@ -6,7 +6,7 @@ import { buildCountryCanonicalByNormalized, canonicalizeCountryName } from "./co
 import { buildInitialGroupMatches, buildInitialKnockoutMatches, listCompetingTeams } from "./fixtures.ts";
 import { buildLeaderboard, computeRoundTeams, deriveBonusFinal } from "./scoring.ts";
 import { findTournamentByParticipantToken, readStore, writeStore } from "./store.ts";
-import { isGroupResult, isKnockoutResult, ROUND_ORDER } from "./types.ts";
+import { DEFAULT_LOCK_MINUTES_BEFORE_KICKOFF, isGroupResult, isKnockoutResult, ROUND_ORDER } from "./types.ts";
 import type { BonusPrediction, GroupResult, KnockoutResult, RoundKey, Store, Tournament } from "./types.ts";
 
 const app = express();
@@ -199,6 +199,22 @@ function hasKickoffStarted(kickoffAt: string | null | undefined) {
   const kickoffTs = new Date(kickoffAt).getTime();
   if (!Number.isFinite(kickoffTs)) return false;
   return Date.now() >= kickoffTs;
+}
+
+function normalizeLockMinutes(raw: unknown) {
+  if (typeof raw !== "number" || !Number.isFinite(raw)) return DEFAULT_LOCK_MINUTES_BEFORE_KICKOFF;
+  return Math.max(0, Math.round(raw));
+}
+
+function getTournamentLockMinutes(tournament: Tournament) {
+  return normalizeLockMinutes(tournament.lockMinutesBeforeKickoff);
+}
+
+function hasKickoffLockStarted(kickoffAt: string | null | undefined, lockMinutesBeforeKickoff: number) {
+  if (!kickoffAt) return false;
+  const kickoffTs = new Date(kickoffAt).getTime();
+  if (!Number.isFinite(kickoffTs)) return false;
+  return Date.now() >= (kickoffTs - lockMinutesBeforeKickoff * 60 * 1000);
 }
 
 app.get("/", (_req, res) => {
@@ -637,6 +653,7 @@ app.post("/api/tournaments", requireAdmin, (req, res) => {
     id: tournamentId,
     name,
     createdAt: new Date().toISOString(),
+    lockMinutesBeforeKickoff: DEFAULT_LOCK_MINUTES_BEFORE_KICKOFF,
     participants: participants.map((participantName) => ({
       id: nanoid(8),
       name: participantName,
@@ -688,6 +705,26 @@ app.patch("/api/tournaments/:id", requireAdmin, (req, res) => {
   tournament.name = name;
   writeStore(store);
   res.json({ ok: true });
+});
+
+app.patch("/api/tournaments/:id/lock-window", requireAdmin, (req, res) => {
+  const store = readStore();
+  const tournament = store.tournaments.find((t) => t.id === req.params.id);
+  if (!tournament) {
+    res.status(404).json({ error: "Torneo no encontrado" });
+    return;
+  }
+
+  const minutesRaw = req.body?.minutes;
+  const minutes = normalizeLockMinutes(minutesRaw);
+  if (typeof minutesRaw !== "number" || !Number.isFinite(minutesRaw)) {
+    res.status(400).json({ error: "Valor inválido de minutos" });
+    return;
+  }
+
+  tournament.lockMinutesBeforeKickoff = minutes;
+  writeStore(store);
+  res.json({ ok: true, minutes });
 });
 
 app.delete("/api/tournaments/:id", requireAdmin, (req, res) => {
@@ -842,6 +879,7 @@ app.get("/api/tournaments/:id", requireAdmin, (req, res) => {
       id: tournament.id,
       name: tournament.name,
       createdAt: tournament.createdAt,
+      lockMinutesBeforeKickoff: getTournamentLockMinutes(tournament),
       participants: tournament.participants.map((p) => ({
         id: p.id,
         name: p.name,
@@ -1003,6 +1041,7 @@ app.get("/api/p/:token", (req, res) => {
     tournament: {
       id: tournament.id,
       name: tournament.name,
+      lockMinutesBeforeKickoff: getTournamentLockMinutes(tournament),
       finalStageEnabled: store.finalStageEnabled,
       groupMatches: tournament.groupMatches,
       knockoutMatches: tournament.knockoutMatches,
@@ -1117,6 +1156,7 @@ app.post("/api/p/:token/submit-group", (req, res) => {
 
   const participant = tournament.participants[participantIndex];
   const projectedTournament = withGlobalTournamentData(store, tournament);
+  const lockMinutesBeforeKickoff = getTournamentLockMinutes(tournament);
   const allTeams = [...new Set(projectedTournament.groupMatches.flatMap((m) => [m.home, m.away]))];
   const countryCanonicalByNormalized = buildCountryCanonicalByNormalized(allTeams);
 
@@ -1125,7 +1165,7 @@ app.post("/api/p/:token/submit-group", (req, res) => {
 
   const nextGroup: Record<string, GroupResult> = { ...participant.predictions.group };
   for (const match of projectedTournament.groupMatches) {
-    if (hasKickoffStarted(match.kickoffAt)) continue;
+    if (hasKickoffLockStarted(match.kickoffAt, lockMinutesBeforeKickoff)) continue;
     const value = groupInput[match.id];
     if (isGroupResult(value)) {
       nextGroup[match.id] = value;
@@ -1136,7 +1176,9 @@ app.post("/api/p/:token/submit-group", (req, res) => {
 
   participant.predictions.group = nextGroup;
 
-  const firstGroupKickoffStarted = projectedTournament.groupMatches.some((m) => hasKickoffStarted(m.kickoffAt));
+  const firstGroupKickoffStarted = projectedTournament.groupMatches.some((m) =>
+    hasKickoffLockStarted(m.kickoffAt, lockMinutesBeforeKickoff)
+  );
   if (!firstGroupKickoffStarted) {
     participant.predictions.bonus = {
       champion: typeof bonusInput.champion === "string" ? canonicalizeCountryName(bonusInput.champion, countryCanonicalByNormalized) : "",
@@ -1172,6 +1214,7 @@ app.post("/api/p/:token/submit-final", (req, res) => {
 
   const participant = tournament.participants[participantIndex];
   const projectedTournament = withGlobalTournamentData(store, tournament);
+  const lockMinutesBeforeKickoff = getTournamentLockMinutes(tournament);
 
   if (!store.finalStageEnabled) {
     res.status(409).json({ error: "La fase final todavía no está habilitada por el admin" });
@@ -1191,7 +1234,7 @@ app.post("/api/p/:token/submit-final", (req, res) => {
   for (const round of ROUND_ORDER) {
     const roundInput = knockoutInput[round] ?? {};
     for (const match of projectedTournament.knockoutMatches[round]) {
-      if (hasKickoffStarted(match.kickoffAt)) continue;
+      if (hasKickoffLockStarted(match.kickoffAt, lockMinutesBeforeKickoff)) continue;
       const matchId = match.id;
       const value = roundInput[matchId];
       if (isKnockoutResult(value)) {
