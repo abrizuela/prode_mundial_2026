@@ -15,6 +15,9 @@ const globalScheduleMsg = document.querySelector("#globalScheduleMsg");
 
 const globalR16Editor = document.querySelector("#globalR16Editor");
 const saveGlobalR16Btn = document.querySelector("#saveGlobalR16");
+const resetKnockoutAllBtn = document.querySelector("#resetKnockoutAll");
+const resetKnockoutTeamsBtn = document.querySelector("#resetKnockoutTeams");
+const resetKnockoutKickoffsBtn = document.querySelector("#resetKnockoutKickoffs");
 const globalR16Msg = document.querySelector("#globalR16Msg");
 const toggleFinalStageEnabledBtn = document.querySelector("#toggleFinalStageEnabled");
 const finalStageEnabledStatus = document.querySelector("#finalStageEnabledStatus");
@@ -782,6 +785,55 @@ sendCustomNotifBtn.addEventListener("click", async () => {
   flashMessage(
     customNotifMsg,
     `Enviado. Torneos: ${data.selectedTournamentCount ?? tournamentIds.length}. Participantes notificados: ${data.deliveredParticipants ?? 0}. Notificaciones enviadas: ${data.sentNotifications ?? 0}.`
+  );
+});
+
+async function resetKnockoutSeed(target, title, text) {
+  const confirmed = await openModal({
+    title,
+    text,
+    confirmText: "Restaurar"
+  });
+  if (!confirmed) return;
+
+  const res = await fetch("/api/admin/knockout/reset", {
+    method: "PATCH",
+    headers: adminHeaders({ "Content-Type": "application/json" }),
+    body: JSON.stringify({ target })
+  });
+
+  const data = await res.json().catch(() => ({}));
+  if (!res.ok) {
+    flashMessage(globalR16Msg, data.error ?? "No se pudo restaurar la configuración", true);
+    return;
+  }
+
+  flashMessage(globalR16Msg, "Configuración restaurada desde seed.");
+  notifyBracketUpdated();
+  await loadGlobalKnockout();
+}
+
+resetKnockoutAllBtn?.addEventListener("click", async () => {
+  await resetKnockoutSeed(
+    "all",
+    "Restaurar cruces y horarios",
+    "Se restaurarán cruces y horarios de fase final al seed. También se limpiarán los resultados cargados de fase final."
+  );
+});
+
+resetKnockoutTeamsBtn?.addEventListener("click", async () => {
+  await resetKnockoutSeed(
+    "teams",
+    "Restaurar cruces",
+    "Se restaurarán solo los cruces de fase final al seed. También se limpiarán los resultados cargados de fase final."
+  );
+});
+
+resetKnockoutKickoffsBtn?.addEventListener("click", async () => {
+  await resetKnockoutSeed(
+    "kickoffs",
+    "Restaurar horarios",
+    "Se restaurarán solo los horarios de fase final al seed."
   );
 });
 

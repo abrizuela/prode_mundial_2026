@@ -653,6 +653,80 @@ app.patch("/api/admin/knockout/results", requireAdmin, (req, res) => {
   res.json({ ok: true });
 });
 
+app.patch("/api/admin/knockout/reset", requireAdmin, (req, res) => {
+  const store = readStore();
+  const target = typeof req.body?.target === "string" ? req.body.target : "all";
+  if (!["all", "teams", "kickoffs"].includes(target)) {
+    res.status(400).json({ error: "Target inválido" });
+    return;
+  }
+
+  const seed = buildInitialKnockoutMatches();
+
+  if (target === "all") {
+    store.globalKnockoutMatches = {
+      R16: seed.R16.map((m) => ({ ...m })),
+      OCT: seed.OCT.map((m) => ({ ...m })),
+      QF: seed.QF.map((m) => ({ ...m })),
+      SF: seed.SF.map((m) => ({ ...m })),
+      THIRD: seed.THIRD.map((m) => ({ ...m })),
+      FINAL: seed.FINAL.map((m) => ({ ...m }))
+    };
+  }
+
+  if (target === "teams") {
+    store.globalKnockoutMatches = {
+      R16: store.globalKnockoutMatches.R16.map((m, i) => ({ ...m, home: seed.R16[i]?.home ?? m.home, away: seed.R16[i]?.away ?? m.away })),
+      OCT: store.globalKnockoutMatches.OCT.map((m, i) => ({ ...m, home: seed.OCT[i]?.home ?? m.home, away: seed.OCT[i]?.away ?? m.away })),
+      QF: store.globalKnockoutMatches.QF.map((m, i) => ({ ...m, home: seed.QF[i]?.home ?? m.home, away: seed.QF[i]?.away ?? m.away })),
+      SF: store.globalKnockoutMatches.SF.map((m, i) => ({ ...m, home: seed.SF[i]?.home ?? m.home, away: seed.SF[i]?.away ?? m.away })),
+      THIRD: store.globalKnockoutMatches.THIRD.map((m, i) => ({ ...m, home: seed.THIRD[i]?.home ?? m.home, away: seed.THIRD[i]?.away ?? m.away })),
+      FINAL: store.globalKnockoutMatches.FINAL.map((m, i) => ({ ...m, home: seed.FINAL[i]?.home ?? m.home, away: seed.FINAL[i]?.away ?? m.away }))
+    };
+  }
+
+  if (target === "kickoffs") {
+    store.globalKnockoutMatches = {
+      R16: store.globalKnockoutMatches.R16.map((m, i) => ({ ...m, kickoffAt: seed.R16[i]?.kickoffAt ?? m.kickoffAt })),
+      OCT: store.globalKnockoutMatches.OCT.map((m, i) => ({ ...m, kickoffAt: seed.OCT[i]?.kickoffAt ?? m.kickoffAt })),
+      QF: store.globalKnockoutMatches.QF.map((m, i) => ({ ...m, kickoffAt: seed.QF[i]?.kickoffAt ?? m.kickoffAt })),
+      SF: store.globalKnockoutMatches.SF.map((m, i) => ({ ...m, kickoffAt: seed.SF[i]?.kickoffAt ?? m.kickoffAt })),
+      THIRD: store.globalKnockoutMatches.THIRD.map((m, i) => ({ ...m, kickoffAt: seed.THIRD[i]?.kickoffAt ?? m.kickoffAt })),
+      FINAL: store.globalKnockoutMatches.FINAL.map((m, i) => ({ ...m, kickoffAt: seed.FINAL[i]?.kickoffAt ?? m.kickoffAt }))
+    };
+  }
+
+  if (target === "all" || target === "teams") {
+    store.globalActual.knockout = emptyKnockoutPredictions();
+  }
+
+  store.tournaments = store.tournaments.map((t) => ({
+    ...t,
+    knockoutMatches: {
+      R16: store.globalKnockoutMatches.R16.map((m) => ({ ...m })),
+      OCT: store.globalKnockoutMatches.OCT.map((m) => ({ ...m })),
+      QF: store.globalKnockoutMatches.QF.map((m) => ({ ...m })),
+      SF: store.globalKnockoutMatches.SF.map((m) => ({ ...m })),
+      THIRD: store.globalKnockoutMatches.THIRD.map((m) => ({ ...m })),
+      FINAL: store.globalKnockoutMatches.FINAL.map((m) => ({ ...m }))
+    },
+    actual: {
+      ...t.actual,
+      knockout: {
+        R16: { ...store.globalActual.knockout.R16 },
+        OCT: { ...store.globalActual.knockout.OCT },
+        QF: { ...store.globalActual.knockout.QF },
+        SF: { ...store.globalActual.knockout.SF },
+        THIRD: { ...store.globalActual.knockout.THIRD },
+        FINAL: { ...store.globalActual.knockout.FINAL }
+      }
+    }
+  }));
+
+  writeStore(store);
+  res.json({ ok: true, target });
+});
+
 app.post("/api/admin/notifications/custom", requireAdmin, (req, res) => {
   void (async () => {
     let store = configureWebPush(readStore());
