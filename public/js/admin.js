@@ -29,6 +29,10 @@ const customNotifBodyInput = document.querySelector("#customNotifBody");
 const customNotifSelector = document.querySelector("#customNotifSelector");
 const sendCustomNotifBtn = document.querySelector("#sendCustomNotif");
 const customNotifMsg = document.querySelector("#customNotifMsg");
+const r16Content = document.querySelector("#r16Content");
+const r16LockedMsg = document.querySelector("#r16LockedMsg");
+const notificationsContent = document.querySelector("#notificationsContent");
+const notificationsLockedMsg = document.querySelector("#notificationsLockedMsg");
 
 const adminKeyInput = document.querySelector("#adminKey");
 const saveAdminKeyBtn = document.querySelector("#saveAdminKey");
@@ -357,6 +361,20 @@ function setupTabs() {
   });
 }
 
+function setAdminRestrictedPanelsVisibility(isAuthorized) {
+  const locked = !isAuthorized;
+
+  r16Content?.classList.toggle("hidden", locked);
+  r16LockedMsg?.classList.toggle("hidden", !locked);
+
+  notificationsContent?.classList.toggle("hidden", locked);
+  notificationsLockedMsg?.classList.toggle("hidden", !locked);
+}
+
+function setCreateTournamentButtonVisibility(isAuthorized) {
+  openCreateBtn?.classList.toggle("hidden", !isAuthorized);
+}
+
 async function validateAdminKey() {
   const key = getAdminKey();
   if (!key) {
@@ -655,12 +673,18 @@ async function loadGlobalKnockout() {
 
 async function loadTournaments() {
   const ok = await validateAdminKey();
+  setAdminRestrictedPanelsVisibility(ok);
+  setCreateTournamentButtonVisibility(ok);
+
   if (!ok) {
+    createModal.classList.add("hidden");
     list.innerHTML = "<p class=\"muted\">Panel bloqueado hasta validar clave admin.</p>";
     globalScheduleWrap.innerHTML = "<p class=\"muted\">Panel bloqueado hasta validar clave admin.</p>";
-    globalR16Editor.innerHTML = "<p class=\"muted\">Panel bloqueado hasta validar clave admin.</p>";
+    globalR16Editor.innerHTML = "";
     globalKnockoutEditor.innerHTML = "";
-    customNotifSelector.innerHTML = "<p class=\"muted\">Panel bloqueado hasta validar clave admin.</p>";
+    globalR16Msg.textContent = "";
+    customNotifSelector.innerHTML = "";
+    customNotifMsg.textContent = "";
     customNotifSelectedTournaments = new Set();
     tournamentsCache = [];
     return;
@@ -839,9 +863,22 @@ resetKnockoutKickoffsBtn?.addEventListener("click", async () => {
 
 adminKeyInput.value = getAdminKey();
 setupTabs();
+setAdminRestrictedPanelsVisibility(false);
+setCreateTournamentButtonVisibility(false);
 loadTournaments();
 
-openCreateBtn.addEventListener("click", () => {
+openCreateBtn.addEventListener("click", async () => {
+  const ok = await validateAdminKey();
+  if (!ok) {
+    await openModal({
+      title: "No autorizado",
+      text: "Guardá una clave admin válida para crear un torneo.",
+      confirmText: "Aceptar",
+      cancelText: "Cerrar"
+    });
+    return;
+  }
+
   createModalName.value = "";
   createModalParticipants.value = "";
   createModal.classList.remove("hidden");
@@ -868,6 +905,17 @@ createModalSave.addEventListener("click", async () => {
 
   const data = await res.json();
   if (!res.ok) {
+    if (res.status === 401) {
+      createModal.classList.add("hidden");
+      await openModal({
+        title: "No autorizado",
+        text: data.error ?? "No autorizado: clave admin inválida.",
+        confirmText: "Aceptar",
+        cancelText: "Cerrar"
+      });
+      return;
+    }
+
     createMsg.textContent = data.error ?? "No se pudo crear el torneo";
     return;
   }

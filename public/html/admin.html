@@ -62,7 +62,9 @@
         <div class="tab-panel hidden" data-panel="r16">
           <h2>Definición de 16vos de final</h2>
           <p class="muted">Elegí los equipos con dropdown y horario del partido.</p>
-          <div class="row" style="align-items:center; gap:10px;">
+          <p id="r16LockedMsg" class="muted hidden">Panel bloqueado hasta validar clave admin.</p>
+          <div id="r16Content" class="stack">
+          <div id="r16Controls" class="row" style="align-items:center; gap:10px;">
             <button id="saveGlobalR16">Guardar 16vos globales</button>
             <button id="resetKnockoutAll" class="secondary" type="button">Restaurar seed (cruces + horarios)</button>
             <button id="resetKnockoutTeams" class="secondary" type="button">Restaurar solo cruces</button>
@@ -72,11 +74,15 @@
           </div>
           <div id="globalR16Editor" class="stack muted">Cargando...</div>
           <p id="globalR16Msg" class="notice"></p>
+          </div>
         </div>
 
         <div class="tab-panel hidden stack" data-panel="notifications">
           <h2>Panel de notificaciones</h2>
           <p class="muted">Creá y enviá notificaciones push custom a los participantes de los torneos seleccionados.</p>
+          <p id="notificationsLockedMsg" class="muted hidden">Panel bloqueado hasta validar clave admin.</p>
+
+          <div id="notificationsContent" class="stack">
 
           <label>
             Título
@@ -94,6 +100,7 @@
             <button id="sendCustomNotif" type="button">Enviar notificación</button>
           </div>
           <p id="customNotifMsg" class="notice"></p>
+          </div>
         </div>
       </section>
 
