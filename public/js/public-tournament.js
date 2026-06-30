@@ -1,4 +1,4 @@
-import { countryFlag, countryLabel, leaderboardTable } from "./common.js";
+import { KNOCKOUT_RESULT, computeRoundTeams, countryFlag, countryLabel, leaderboardTable } from "./common.js";
 
 const parts = window.location.pathname.split("/").filter(Boolean);
 const tournamentSlug = parts[1] ?? "";
@@ -12,9 +12,33 @@ const whatsappMatchSelect = document.querySelector("#whatsappMatchSelect");
 const whatsappPreview = document.querySelector("#whatsappPreview");
 const copyWhatsappBtn = document.querySelector("#copyWhatsappBtn");
 const whatsappMsg = document.querySelector("#whatsappMsg");
+const finalStageBracket = document.querySelector("#finalStageBracket");
 
 let currentSummaries = [];
 let currentTournamentName = "Torneo";
+
+const roundLabel = {
+  R16: "Dieciseisavos",
+  OCT: "Octavos",
+  QF: "Cuartos",
+  SF: "Semifinales",
+  FINAL: "Final",
+  THIRD: "3er. Puesto"
+};
+
+const knockoutMatchStart = {
+  R16: 73,
+  OCT: 89,
+  QF: 97,
+  SF: 101,
+  THIRD: 103,
+  FINAL: 104
+};
+
+const PUBLIC_ROUND_ORDER = ["R16", "OCT", "QF", "SF", "THIRD", "FINAL"];
+
+let currentFinalStageData = null;
+let selectedFinalStageRound = "R16";
 
 function onBracketUpdated() {
   void loadPublicTournament();
@@ -42,6 +66,177 @@ function setNotice(el, text, isError = false) {
   if (!el) return;
   el.textContent = text;
   el.style.color = isError ? "#a62d2d" : "";
+}
+
+function escapeHtml(value) {
+  return String(value ?? "")
+    .replaceAll("&", "&amp;")
+    .replaceAll("<", "&lt;")
+    .replaceAll(">", "&gt;")
+    .replaceAll('"', "&quot;")
+    .replaceAll("'", "&#39;");
+}
+
+function normalizePlaceholderName(teamName) {
+  const text = String(teamName ?? "").trim();
+  const winner = text.match(/^GANADOR\s+Partido\s+(\d+)$/i);
+  if (winner) return `Ganador Partido ${winner[1]}`;
+
+  const loser = text.match(/^PERDEDOR\s+Partido\s+(\d+)$/i);
+  if (loser) return `Perdedor Partido ${loser[1]}`;
+
+  if (/^POR DEFINIR\b/i.test(text)) {
+    return "Por definir";
+  }
+
+  return text;
+}
+
+function isPlaceholderTeam(teamName) {
+  return /^(GANADOR|PERDEDOR)\s+Partido\s+\d+$/i.test(String(teamName ?? "")) || /^POR DEFINIR\b/i.test(String(teamName ?? ""));
+}
+
+function displayTeam(teamName) {
+  if (isPlaceholderTeam(teamName)) {
+    return normalizePlaceholderName(teamName);
+  }
+  return countryLabel(teamName || "Por definir");
+}
+
+function displayKickoff(kickoffAt) {
+  const formatted = formatDate(kickoffAt);
+  return formatted || "Día y hora a confirmar";
+}
+
+function matchNumber(round, index) {
+  const start = knockoutMatchStart[round];
+  if (typeof start !== "number") return null;
+  return start + index;
+}
+
+function winnerSide(result) {
+  if (!result) return "";
+  return result === KNOCKOUT_RESULT.HOME ? "home" : "away";
+}
+
+function renderBracketCard({ round, index, match, projected, result }) {
+  const side = winnerSide(result);
+  const number = matchNumber(round, typeof match.index === "number" ? match.index : index);
+
+  const homeClasses = ["bracket-team-line"];
+  const awayClasses = ["bracket-team-line"];
+
+  if (isPlaceholderTeam(projected.home)) homeClasses.push("is-placeholder");
+  if (isPlaceholderTeam(projected.away)) awayClasses.push("is-placeholder");
+  if (side === "home") homeClasses.push("is-winner");
+  if (side === "away") awayClasses.push("is-winner");
+
+  return `
+    <article class="bracket-match-card">
+      <div class="bracket-match-top">
+        <span class="tag">${number ? `Partido ${number}` : escapeHtml(match.id)}</span>
+        <span class="bracket-kickoff">${escapeHtml(displayKickoff(match.kickoffAt))}</span>
+      </div>
+      <div class="${homeClasses.join(" ")}">${escapeHtml(displayTeam(projected.home))}</div>
+      <div class="${awayClasses.join(" ")}">${escapeHtml(displayTeam(projected.away))}</div>
+      <div class="bracket-status ${result ? "is-loaded" : "is-pending"}">${result ? "Resultado cargado" : "Pendiente"}</div>
+    </article>
+  `;
+}
+
+function getAvailableRounds(knockoutMatches) {
+  return PUBLIC_ROUND_ORDER.filter((round) => {
+    const matches = knockoutMatches?.[round];
+    return Array.isArray(matches) && matches.length > 0;
+  });
+}
+
+function buildRoundSelector(availableRounds, selectedRound) {
+  const buttons = availableRounds.map((round) => {
+    const active = selectedRound === round;
+    return `<button type="button" class="round-chip ${active ? "is-active" : ""}" data-round="${round}">${escapeHtml(roundLabel[round] ?? round)}</button>`;
+  }).join("");
+
+  return `<div class="round-chip-list" role="tablist" aria-label="Seleccionar ronda">${buttons}</div>`;
+}
+
+function buildRoundMatches(round, knockoutMatches, roundTeams, actualKnockout) {
+  const matches = Array.isArray(knockoutMatches?.[round]) ? knockoutMatches[round] : [];
+  const projectedTeams = Array.isArray(roundTeams?.[round]) ? roundTeams[round] : [];
+
+  if (!matches.length) {
+    return '<p class="muted">No hay partidos para esta ronda.</p>';
+  }
+
+  const projectedById = new Map(matches.map((match, index) => [match.id, projectedTeams[index] ?? { home: match.home, away: match.away }]));
+
+  const sortedMatches = [...matches].sort((a, b) => {
+    const aTime = a?.kickoffAt ? Date.parse(a.kickoffAt) : Number.POSITIVE_INFINITY;
+    const bTime = b?.kickoffAt ? Date.parse(b.kickoffAt) : Number.POSITIVE_INFINITY;
+    if (aTime !== bTime) return aTime - bTime;
+    const aIndex = typeof a.index === "number" ? a.index : Number.POSITIVE_INFINITY;
+    const bIndex = typeof b.index === "number" ? b.index : Number.POSITIVE_INFINITY;
+    if (aIndex !== bIndex) return aIndex - bIndex;
+    return String(a.id ?? "").localeCompare(String(b.id ?? ""));
+  });
+
+  const cards = sortedMatches.map((match) => {
+    const projected = projectedById.get(match.id) ?? { home: match.home, away: match.away };
+    const result = actualKnockout?.[round]?.[match.id];
+    const index = typeof match.index === "number" ? match.index : 0;
+    return renderBracketCard({ round, index, match, projected, result });
+  }).join("");
+
+  return `<div class="round-match-list">${cards}</div>`;
+}
+
+function bindRoundSelector() {
+  if (!finalStageBracket) return;
+  finalStageBracket.querySelectorAll(".round-chip").forEach((btn) => {
+    btn.addEventListener("click", () => {
+      const nextRound = btn.getAttribute("data-round") || "";
+      if (!nextRound || nextRound === selectedFinalStageRound) return;
+      selectedFinalStageRound = nextRound;
+      renderFinalStage(currentFinalStageData);
+    });
+  });
+}
+
+function renderFinalStage(finalStage) {
+  if (!finalStageBracket) return;
+
+  currentFinalStageData = finalStage;
+
+  const knockoutMatches = finalStage?.knockoutMatches ?? {};
+  const actualKnockout = finalStage?.actualKnockout ?? {};
+  const r16Matches = Array.isArray(knockoutMatches.R16) ? knockoutMatches.R16 : [];
+  const roundTeams = finalStage?.roundTeams ?? computeRoundTeams(r16Matches, actualKnockout);
+
+  if (!r16Matches.length) {
+    finalStageBracket.innerHTML = '<p class="muted">Todavía no hay cruces de fase final para mostrar.</p>';
+    return;
+  }
+
+  const availableRounds = getAvailableRounds(knockoutMatches);
+  if (!availableRounds.length) {
+    finalStageBracket.innerHTML = '<p class="muted">Todavía no hay rondas disponibles.</p>';
+    return;
+  }
+
+  if (!availableRounds.includes(selectedFinalStageRound)) {
+    selectedFinalStageRound = availableRounds[0];
+  }
+
+  finalStageBracket.innerHTML = `
+    <section class="unified-final-stage">
+      ${buildRoundSelector(availableRounds, selectedFinalStageRound)}
+      <div class="round-panel">
+        ${buildRoundMatches(selectedFinalStageRound, knockoutMatches, roundTeams, actualKnockout)}
+      </div>
+    </section>
+  `;
+
+  bindRoundSelector();
 }
 
 function formatNames(names) {
@@ -75,7 +270,13 @@ function buildWhatsAppSummary(tournamentName, match) {
 }
 
 function renderWhatsAppSection(tournamentName, summaries) {
-  currentSummaries = Array.isArray(summaries) ? summaries : [];
+  currentSummaries = Array.isArray(summaries) ? [...summaries] : [];
+  currentSummaries.sort((a, b) => {
+    const aTime = a?.kickoffAt ? Date.parse(a.kickoffAt) : Number.NEGATIVE_INFINITY;
+    const bTime = b?.kickoffAt ? Date.parse(b.kickoffAt) : Number.NEGATIVE_INFINITY;
+    if (aTime !== bTime) return aTime - bTime;
+    return String(a.key ?? "").localeCompare(String(b.key ?? ""));
+  });
   whatsappMatchSelect.innerHTML = "";
 
   if (!currentSummaries.length) {
@@ -99,8 +300,9 @@ function renderWhatsAppSection(tournamentName, summaries) {
 
   whatsappMatchSelect.disabled = false;
   copyWhatsappBtn.disabled = false;
-  whatsappMatchSelect.value = currentSummaries[0].key;
-  whatsappPreview.value = buildWhatsAppSummary(tournamentName, currentSummaries[0]);
+  const defaultMatch = currentSummaries[currentSummaries.length - 1];
+  whatsappMatchSelect.value = defaultMatch.key;
+  whatsappPreview.value = buildWhatsAppSummary(tournamentName, defaultMatch);
   setNotice(whatsappMsg, "");
 }
 
@@ -145,6 +347,7 @@ async function loadPublicTournament() {
   subtitle.textContent = `${count} participante${count === 1 ? "" : "s"}${createdAt ? ` · creado el ${createdAt}` : ""}`;
 
   leaderboardEl.innerHTML = leaderboardTable(data.leaderboard || []);
+  renderFinalStage(data.finalStage || null);
   renderWhatsAppSection(tournamentName, data.whatsappSummaries || []);
 }
 

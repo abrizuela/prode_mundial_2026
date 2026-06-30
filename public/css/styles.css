@@ -589,6 +589,33 @@ button:disabled {
   margin-top: 10px;
 }
 
+#finalStageDetails > summary {
+  list-style: none;
+  display: flex;
+  justify-content: flex-start;
+  align-items: center;
+  gap: 0;
+}
+
+#finalStageDetails > summary::-webkit-details-marker {
+  display: none;
+}
+
+#finalStageDetails > summary::before {
+  content: "";
+  width: 0;
+  height: 0;
+  border-top: 6px solid transparent;
+  border-bottom: 6px solid transparent;
+  border-left: 8px solid var(--accent);
+  margin-right: 10px;
+  transition: transform 0.18s ease;
+}
+
+#finalStageDetails[open] > summary::before {
+  transform: rotate(90deg);
+}
+
 .submit-inline {
   margin-top: 30px;
   margin-bottom: 30px;
@@ -603,4 +630,126 @@ button:disabled {
   min-height: 190px;
   line-height: 1.35;
   resize: vertical;
+}
+
+.public-bracket-scroll {
+  width: 100%;
+}
+
+.unified-final-stage {
+  width: min(620px, 100%);
+  margin: 0 auto;
+  border: 1px solid #e6dece;
+  border-radius: 14px;
+  background: linear-gradient(180deg, #fffefb 0%, #f8f4ed 100%);
+  padding: 10px;
+}
+
+.round-chip-list {
+  display: flex;
+  gap: 8px;
+  overflow-x: auto;
+  padding-bottom: 6px;
+}
+
+.round-chip {
+  border: 1px solid var(--border);
+  border-radius: 999px;
+  background: #fff;
+  color: var(--ink);
+  font-size: 0.84rem;
+  font-weight: 700;
+  padding: 8px 12px;
+  white-space: nowrap;
+  width: auto;
+}
+
+.round-chip.is-active {
+  color: #fff;
+  border-color: transparent;
+  background: linear-gradient(130deg, var(--accent), #0a9396);
+}
+
+.round-panel {
+  margin-top: 8px;
+  padding: 0;
+}
+
+.round-match-list {
+  display: grid;
+  gap: 10px;
+}
+
+.bracket-match-card {
+  border: 1px solid #e7dfd1;
+  border-radius: 12px;
+  padding: 10px;
+  background: #fff;
+  box-shadow: 0 6px 16px rgba(32, 42, 45, 0.06);
+}
+
+.bracket-match-top {
+  display: grid;
+  gap: 6px;
+  margin-bottom: 8px;
+}
+
+.bracket-kickoff {
+  font-size: 0.74rem;
+  font-weight: 700;
+  color: #4b5b5e;
+}
+
+.bracket-team-line {
+  border: 1px solid #efe8dc;
+  border-radius: 10px;
+  background: #fffdf9;
+  padding: 6px 7px;
+  font-size: 0.8rem;
+  line-height: 1.2;
+}
+
+.bracket-team-line + .bracket-team-line {
+  margin-top: 6px;
+}
+
+.bracket-team-line.is-placeholder {
+  color: #6d665c;
+  font-style: italic;
+  border-style: dashed;
+}
+
+.bracket-team-line.is-winner {
+  color: #155f35;
+  background: #e4f7ea;
+  border-color: #a7dfbe;
+  font-weight: 700;
+}
+
+.bracket-status {
+  margin-top: 8px;
+  font-size: 0.74rem;
+  font-weight: 700;
+  text-transform: uppercase;
+  letter-spacing: 0.03em;
+}
+
+.bracket-status.is-pending {
+  color: #7a5a22;
+}
+
+.bracket-status.is-loaded {
+  color: #1f7a3f;
+}
+
+@media (max-width: 1080px) {
+  .unified-final-stage {
+    width: min(560px, 100%);
+  }
+}
+
+@media (max-width: 860px) {
+  .unified-final-stage {
+    width: 100%;
+  }
 }

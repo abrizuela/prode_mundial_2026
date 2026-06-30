@@ -1304,6 +1304,7 @@ app.get("/api/public/tournaments/:slug", (req, res) => {
 
   const store = readStore();
   const tournament = withGlobalTournamentData(store, found);
+  const publicRoundTeams = computeRoundTeams(tournament.knockoutMatches.R16, tournament.actual.knockout);
   res.json({
     tournament: {
       id: tournament.id,
@@ -1314,7 +1315,13 @@ app.get("/api/public/tournaments/:slug", (req, res) => {
       lockMinutesBeforeKickoff: getTournamentLockMinutes(tournament)
     },
     leaderboard: buildLeaderboard(tournament),
-    whatsappSummaries: buildPublicWhatsAppSummaries(tournament)
+    whatsappSummaries: buildPublicWhatsAppSummaries(tournament),
+    finalStage: {
+      enabled: store.finalStageEnabled,
+      knockoutMatches: tournament.knockoutMatches,
+      actualKnockout: tournament.actual.knockout,
+      roundTeams: publicRoundTeams
+    }
   });
 });
 
