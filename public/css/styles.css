@@ -589,7 +589,8 @@ button:disabled {
   margin-top: 10px;
 }
 
-#finalStageDetails > summary {
+#finalStageDetails > summary,
+#groupStageDetails > summary {
   list-style: none;
   display: flex;
   justify-content: flex-start;
@@ -597,11 +598,13 @@ button:disabled {
   gap: 0;
 }
 
-#finalStageDetails > summary::-webkit-details-marker {
+#finalStageDetails > summary::-webkit-details-marker,
+#groupStageDetails > summary::-webkit-details-marker {
   display: none;
 }
 
-#finalStageDetails > summary::before {
+#finalStageDetails > summary::before,
+#groupStageDetails > summary::before {
   content: "";
   width: 0;
   height: 0;
@@ -612,7 +615,8 @@ button:disabled {
   transition: transform 0.18s ease;
 }
 
-#finalStageDetails[open] > summary::before {
+#finalStageDetails[open] > summary::before,
+#groupStageDetails[open] > summary::before {
   transform: rotate(90deg);
 }
 
@@ -637,7 +641,7 @@ button:disabled {
 }
 
 .unified-final-stage {
-  width: min(620px, 100%);
+  width: min(760px, 100%);
   margin: 0 auto;
   border: 1px solid #e6dece;
   border-radius: 14px;
@@ -652,6 +656,14 @@ button:disabled {
   padding-bottom: 6px;
 }
 
+.group-chip-list {
+  display: grid;
+  grid-template-columns: repeat(4, minmax(0, 1fr));
+  gap: 8px;
+  overflow: visible;
+  padding-bottom: 0;
+}
+
 .round-chip {
   border: 1px solid var(--border);
   border-radius: 999px;
@@ -664,10 +676,34 @@ button:disabled {
   width: auto;
 }
 
+.group-chip {
+  width: 100%;
+  white-space: nowrap;
+  line-height: 1.2;
+  font-size: 0.8rem;
+  padding: 8px 10px;
+}
+
 .round-chip.is-active {
   color: #fff;
   border-color: transparent;
   background: linear-gradient(130deg, var(--accent), #0a9396);
+}
+
+.selector-field {
+  display: grid;
+  gap: 6px;
+  font-weight: 700;
+  color: var(--ink);
+}
+
+.selector-control {
+  width: 100%;
+  border: 1px solid var(--border);
+  border-radius: 12px;
+  background: #fff;
+  padding: 10px 12px;
+  font-weight: 700;
 }
 
 .round-panel {
@@ -726,6 +762,13 @@ button:disabled {
   font-weight: 700;
 }
 
+.bracket-team-line.is-draw {
+  color: #7a5a22;
+  background: #fff2d9;
+  border-color: #f0d6a4;
+  font-weight: 700;
+}
+
 .bracket-status {
   margin-top: 8px;
   font-size: 0.74rem;
@@ -744,12 +787,25 @@ button:disabled {
 
 @media (max-width: 1080px) {
   .unified-final-stage {
-    width: min(560px, 100%);
+    width: min(700px, 100%);
+  }
+
+  .group-chip-list {
+    grid-template-columns: repeat(2, minmax(0, 1fr));
   }
 }
 
 @media (max-width: 860px) {
   .unified-final-stage {
     width: 100%;
+  }
+
+  .group-chip-list {
+    grid-template-columns: 1fr;
+  }
+
+  .round-chip-list {
+    overflow-x: visible;
+    padding-bottom: 0;
   }
 }

@@ -1316,6 +1316,10 @@ app.get("/api/public/tournaments/:slug", (req, res) => {
     },
     leaderboard: buildLeaderboard(tournament),
     whatsappSummaries: buildPublicWhatsAppSummaries(tournament),
+    groupStage: {
+      groupMatches: tournament.groupMatches,
+      actualGroup: tournament.actual.group
+    },
     finalStage: {
       enabled: store.finalStageEnabled,
       knockoutMatches: tournament.knockoutMatches,

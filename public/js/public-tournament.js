@@ -1,4 +1,4 @@
-import { KNOCKOUT_RESULT, computeRoundTeams, countryFlag, countryLabel, leaderboardTable } from "./common.js";
+import { GROUP_RESULT, KNOCKOUT_RESULT, computeRoundTeams, countryFlag, countryLabel, leaderboardTable } from "./common.js";
 
 const parts = window.location.pathname.split("/").filter(Boolean);
 const tournamentSlug = parts[1] ?? "";
@@ -12,15 +12,18 @@ const whatsappMatchSelect = document.querySelector("#whatsappMatchSelect");
 const whatsappPreview = document.querySelector("#whatsappPreview");
 const copyWhatsappBtn = document.querySelector("#copyWhatsappBtn");
 const whatsappMsg = document.querySelector("#whatsappMsg");
+const groupStageDetails = document.querySelector("#groupStageDetails");
+const finalStageDetails = document.querySelector("#finalStageDetails");
+const groupStageBracket = document.querySelector("#groupStageBracket");
 const finalStageBracket = document.querySelector("#finalStageBracket");
 
 let currentSummaries = [];
 let currentTournamentName = "Torneo";
 
 const roundLabel = {
-  R16: "Dieciseisavos",
-  OCT: "Octavos",
-  QF: "Cuartos",
+  R16: "16vos. de final",
+  OCT: "Octavos de final",
+  QF: "Cuartos de final",
   SF: "Semifinales",
   FINAL: "Final",
   THIRD: "3er. Puesto"
@@ -36,9 +39,12 @@ const knockoutMatchStart = {
 };
 
 const PUBLIC_ROUND_ORDER = ["R16", "OCT", "QF", "SF", "THIRD", "FINAL"];
+const COMPACT_SELECTOR_BREAKPOINT = 860;
 
 let currentFinalStageData = null;
-let selectedFinalStageRound = "R16";
+let selectedFinalStageRound = readStoredValue("selectedFinalStageRound") || "R16";
+let currentGroupStageData = null;
+let selectedGroupStageGroup = readStoredValue("selectedGroupStageGroup") || "";
 
 function onBracketUpdated() {
   void loadPublicTournament();
@@ -75,6 +81,55 @@ function escapeHtml(value) {
     .replaceAll(">", "&gt;")
     .replaceAll('"', "&quot;")
     .replaceAll("'", "&#39;");
+}
+
+function isCompactViewport() {
+  return window.matchMedia(`(max-width: ${COMPACT_SELECTOR_BREAKPOINT}px)`).matches;
+}
+
+function storageKey(suffix) {
+  const scope = tournamentSlug || "public";
+  return `prode:${scope}:${suffix}`;
+}
+
+function readStoredValue(suffix) {
+  try {
+    return localStorage.getItem(storageKey(suffix));
+  } catch {
+    return null;
+  }
+}
+
+function writeStoredValue(suffix, value) {
+  try {
+    localStorage.setItem(storageKey(suffix), String(value));
+  } catch {
+    // ignore storage errors (private mode/quota)
+  }
+}
+
+function restoreCollapsedSections() {
+  if (groupStageDetails) {
+    const collapsed = readStoredValue("groupStageCollapsed");
+    if (collapsed === "1") groupStageDetails.open = false;
+    if (collapsed === "0") groupStageDetails.open = true;
+  }
+
+  if (finalStageDetails) {
+    const collapsed = readStoredValue("finalStageCollapsed");
+    if (collapsed === "1") finalStageDetails.open = false;
+    if (collapsed === "0") finalStageDetails.open = true;
+  }
+}
+
+function bindCollapsedSectionsPersistence() {
+  groupStageDetails?.addEventListener("toggle", () => {
+    writeStoredValue("groupStageCollapsed", groupStageDetails.open ? "0" : "1");
+  });
+
+  finalStageDetails?.addEventListener("toggle", () => {
+    writeStoredValue("finalStageCollapsed", finalStageDetails.open ? "0" : "1");
+  });
 }
 
 function normalizePlaceholderName(teamName) {
@@ -119,6 +174,157 @@ function winnerSide(result) {
   return result === KNOCKOUT_RESULT.HOME ? "home" : "away";
 }
 
+function getAvailableGroups(groupMatches) {
+  const groups = [...new Set((Array.isArray(groupMatches) ? groupMatches : []).map((m) => String(m.group || "").trim()).filter(Boolean))];
+  return groups.sort((a, b) => a.localeCompare(b));
+}
+
+function sortedMatchesByKickoff(matches) {
+  return [...matches].sort((a, b) => {
+    const aTime = a?.kickoffAt ? Date.parse(a.kickoffAt) : Number.POSITIVE_INFINITY;
+    const bTime = b?.kickoffAt ? Date.parse(b.kickoffAt) : Number.POSITIVE_INFINITY;
+    if (aTime !== bTime) return aTime - bTime;
+    return String(a.id ?? "").localeCompare(String(b.id ?? ""));
+  });
+}
+
+function groupTeamSummary(matchesOfGroup) {
+  const teams = [];
+  for (const match of matchesOfGroup) {
+    if (match?.home && !teams.includes(match.home)) teams.push(match.home);
+    if (match?.away && !teams.includes(match.away)) teams.push(match.away);
+  }
+  return teams;
+}
+
+function buildGroupSelector(groups, selectedGroup, groupMatches) {
+  if (isCompactViewport()) {
+    const options = groups.map((group) => {
+      const matchesOfGroup = sortedMatchesByKickoff((groupMatches || []).filter((m) => m.group === group));
+      const teams = groupTeamSummary(matchesOfGroup);
+      const flags = teams.map((team) => countryFlag(team)).filter(Boolean).join(" ");
+      const label = flags ? `Grupo ${group} ${flags}` : `Grupo ${group}`;
+      return `<option value="${group}" ${selectedGroup === group ? "selected" : ""}>${escapeHtml(label)}</option>`;
+    }).join("");
+
+    return `
+      <label class="selector-field" for="groupStageGroupSelect">
+        Grupo
+        <select id="groupStageGroupSelect" class="selector-control">${options}</select>
+      </label>
+    `;
+  }
+
+  const buttons = groups.map((group) => {
+    const matchesOfGroup = sortedMatchesByKickoff((groupMatches || []).filter((m) => m.group === group));
+    const teams = groupTeamSummary(matchesOfGroup);
+    const flags = teams.map((team) => countryFlag(team)).filter(Boolean).join(" ");
+    const label = flags ? `Grupo ${group} ${flags}` : `Grupo ${group}`;
+    const active = selectedGroup === group;
+    return `<button type="button" class="round-chip group-chip ${active ? "is-active" : ""}" data-group="${group}">${escapeHtml(label)}</button>`;
+  }).join("");
+
+  return `<div class="round-chip-list group-chip-list" role="tablist" aria-label="Seleccionar grupo">${buttons}</div>`;
+}
+
+function renderGroupMatchCard(match, result) {
+  const homeClasses = ["bracket-team-line"];
+  const awayClasses = ["bracket-team-line"];
+
+  if (result === GROUP_RESULT.HOME) {
+    homeClasses.push("is-winner");
+  } else if (result === GROUP_RESULT.AWAY) {
+    awayClasses.push("is-winner");
+  } else if (result === GROUP_RESULT.DRAW) {
+    homeClasses.push("is-draw");
+    awayClasses.push("is-draw");
+  }
+
+  const statusText = result ? "Resultado cargado" : "Pendiente";
+  const statusClass = result ? "is-loaded" : "is-pending";
+
+  return `
+    <article class="bracket-match-card">
+      <div class="bracket-match-top">
+        <span class="tag">${escapeHtml(match.id)}</span>
+        <span class="bracket-kickoff">${escapeHtml(displayKickoff(match.kickoffAt))}</span>
+      </div>
+      <div class="${homeClasses.join(" ")}">${escapeHtml(countryLabel(match.home))}</div>
+      <div class="${awayClasses.join(" ")}">${escapeHtml(countryLabel(match.away))}</div>
+      <div class="bracket-status ${statusClass}">${statusText}</div>
+    </article>
+  `;
+}
+
+function buildGroupMatches(selectedGroup, groupMatches, actualGroup) {
+  const matches = sortedMatchesByKickoff((groupMatches || []).filter((m) => m.group === selectedGroup));
+  if (!matches.length) {
+    return '<p class="muted">No hay partidos para este grupo.</p>';
+  }
+
+  const cards = matches.map((match) => {
+    const result = actualGroup?.[match.id];
+    return renderGroupMatchCard(match, result);
+  }).join("");
+
+  return `<div class="round-match-list">${cards}</div>`;
+}
+
+function bindGroupSelector() {
+  if (!groupStageBracket) return;
+  const select = groupStageBracket.querySelector("#groupStageGroupSelect");
+  if (select) {
+    select.addEventListener("change", () => {
+      const nextGroup = select.value || "";
+      if (!nextGroup || nextGroup === selectedGroupStageGroup) return;
+      selectedGroupStageGroup = nextGroup;
+      writeStoredValue("selectedGroupStageGroup", selectedGroupStageGroup);
+      renderGroupStage(currentGroupStageData);
+    });
+    return;
+  }
+
+  groupStageBracket.querySelectorAll(".round-chip[data-group]").forEach((btn) => {
+    btn.addEventListener("click", () => {
+      const nextGroup = btn.getAttribute("data-group") || "";
+      if (!nextGroup || nextGroup === selectedGroupStageGroup) return;
+      selectedGroupStageGroup = nextGroup;
+      writeStoredValue("selectedGroupStageGroup", selectedGroupStageGroup);
+      renderGroupStage(currentGroupStageData);
+    });
+  });
+}
+
+function renderGroupStage(groupStage) {
+  if (!groupStageBracket) return;
+
+  currentGroupStageData = groupStage;
+  const groupMatches = Array.isArray(groupStage?.groupMatches) ? groupStage.groupMatches : [];
+  const actualGroup = groupStage?.actualGroup ?? {};
+  const groups = getAvailableGroups(groupMatches);
+
+  if (!groups.length) {
+    groupStageBracket.innerHTML = '<p class="muted">Todavía no hay partidos de grupos para mostrar.</p>';
+    return;
+  }
+
+  if (!groups.includes(selectedGroupStageGroup)) {
+    selectedGroupStageGroup = groups[0];
+    writeStoredValue("selectedGroupStageGroup", selectedGroupStageGroup);
+  }
+
+  groupStageBracket.innerHTML = `
+    <section class="unified-final-stage unified-group-stage">
+      ${buildGroupSelector(groups, selectedGroupStageGroup, groupMatches)}
+      <div class="round-panel">
+        ${buildGroupMatches(selectedGroupStageGroup, groupMatches, actualGroup)}
+      </div>
+    </section>
+  `;
+
+  bindGroupSelector();
+}
+
 function renderBracketCard({ round, index, match, projected, result }) {
   const side = winnerSide(result);
   const number = matchNumber(round, typeof match.index === "number" ? match.index : index);
@@ -152,6 +358,19 @@ function getAvailableRounds(knockoutMatches) {
 }
 
 function buildRoundSelector(availableRounds, selectedRound) {
+  if (isCompactViewport()) {
+    const options = availableRounds.map((round) => `
+      <option value="${round}" ${selectedRound === round ? "selected" : ""}>${escapeHtml(roundLabel[round] ?? round)}</option>
+    `).join("");
+
+    return `
+      <label class="selector-field" for="finalStageRoundSelect">
+        Ronda
+        <select id="finalStageRoundSelect" class="selector-control">${options}</select>
+      </label>
+    `;
+  }
+
   const buttons = availableRounds.map((round) => {
     const active = selectedRound === round;
     return `<button type="button" class="round-chip ${active ? "is-active" : ""}" data-round="${round}">${escapeHtml(roundLabel[round] ?? round)}</button>`;
@@ -192,11 +411,24 @@ function buildRoundMatches(round, knockoutMatches, roundTeams, actualKnockout) {
 
 function bindRoundSelector() {
   if (!finalStageBracket) return;
+  const select = finalStageBracket.querySelector("#finalStageRoundSelect");
+  if (select) {
+    select.addEventListener("change", () => {
+      const nextRound = select.value || "";
+      if (!nextRound || nextRound === selectedFinalStageRound) return;
+      selectedFinalStageRound = nextRound;
+      writeStoredValue("selectedFinalStageRound", selectedFinalStageRound);
+      renderFinalStage(currentFinalStageData);
+    });
+    return;
+  }
+
   finalStageBracket.querySelectorAll(".round-chip").forEach((btn) => {
     btn.addEventListener("click", () => {
       const nextRound = btn.getAttribute("data-round") || "";
       if (!nextRound || nextRound === selectedFinalStageRound) return;
       selectedFinalStageRound = nextRound;
+      writeStoredValue("selectedFinalStageRound", selectedFinalStageRound);
       renderFinalStage(currentFinalStageData);
     });
   });
@@ -225,6 +457,7 @@ function renderFinalStage(finalStage) {
 
   if (!availableRounds.includes(selectedFinalStageRound)) {
     selectedFinalStageRound = availableRounds[0];
+    writeStoredValue("selectedFinalStageRound", selectedFinalStageRound);
   }
 
   finalStageBracket.innerHTML = `
@@ -347,6 +580,7 @@ async function loadPublicTournament() {
   subtitle.textContent = `${count} participante${count === 1 ? "" : "s"}${createdAt ? ` · creado el ${createdAt}` : ""}`;
 
   leaderboardEl.innerHTML = leaderboardTable(data.leaderboard || []);
+  renderGroupStage(data.groupStage || null);
   renderFinalStage(data.finalStage || null);
   renderWhatsAppSection(tournamentName, data.whatsappSummaries || []);
 }
@@ -371,4 +605,13 @@ copyWhatsappBtn?.addEventListener("click", async () => {
 });
 
 refreshBtn.addEventListener("click", loadPublicTournament);
+
+window.addEventListener("resize", () => {
+  renderGroupStage(currentGroupStageData);
+  renderFinalStage(currentFinalStageData);
+});
+
+restoreCollapsedSections();
+bindCollapsedSectionsPersistence();
+
 loadPublicTournament();
